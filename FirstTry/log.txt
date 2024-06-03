@@ -66,3 +66,6 @@ INFO:root:Created model, now training
 INFO:root:Getting the training data from/Users/paulwahlen/Desktop/Internship/ML/Code/TransfoV1/data
 INFO:root:Loaded the data and saved vocabularies
 INFO:root:Created model, now training
+INFO:root:Getting the training data from/Users/paulwahlen/Desktop/Internship/ML/Code/TransfoV1/data
+INFO:root:Loaded the data and saved vocabularies
+INFO:root:Created model, now training
