@@ -14,10 +14,10 @@ import glob
     output:
         src_padding_mask: mask for the source padding tokens, shape: (N,S)
         tgt_padding_mask: mask for the target padding tokens, shape: (N,T)'''
-def create_mask(src, tgt, pad_symbol):
-    pad_symbol_broad = torch.tensor(pad_symbol).unsqueeze(0).unsqueeze(0)
-    src_padding_mask = torch.all((src[...,-2:] == pad_symbol_broad), dim = -1)
-    tgt_padding_mask = torch.all((tgt[...,-2:]== pad_symbol_broad), dim = -1)
+def create_mask(src, tgt, pad_symbol, device):
+    pad_symbol_broad = torch.tensor(pad_symbol).unsqueeze(0).unsqueeze(0).to(device)
+    src_padding_mask = torch.all((src[...,-2:] == pad_symbol_broad), dim = -1).to(device)
+    tgt_padding_mask = torch.all((tgt[...,-2:]== pad_symbol_broad), dim = -1).to(device)
 
     return src_padding_mask, tgt_padding_mask
 
@@ -139,9 +139,9 @@ class CollectionHitsTraining(Dataset):
             do_time: bool, if True, time of hits is kept'''
     def __init__(self, dir_path: str, special_symbols: dict,do_tracks: bool = False, do_time: bool = False):
         super(CollectionHitsTraining,self).__init__()
-        filenames = list(sorted(glob.iglob(dir_path + '/*.h5')))
+        filenames = list(sorted(glob.iglob(dir_path + '/*.h5')))[0:1]
         if len(filenames) == 1:
-            feats, labels = la.load_awkward2(filenames) #get the events from the only file
+            feats, labels = la.load_awkward2(filenames[0]) #get the events from the only file
         elif len(filenames) > 1:
             feats, labels = la.load_awkwards(filenames) #get the events from each file
         else:
@@ -158,7 +158,7 @@ class CollectionHitsTraining(Dataset):
         else:
             feats = feats[:,:,:4]
 
-        PDGs_mask = np.abs(labels[...,2])
+        PDGs_mask = np.abs(labels[...,2]) < 1e3
         labels = labels[PDGs_mask]
 
         self.E_label_RMS_normalizer = RMSNormalizer()
