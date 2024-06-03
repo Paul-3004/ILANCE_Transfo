@@ -6,11 +6,11 @@ from torch.nn.functional import softmax
 class Embedder(nn.Module):
     def __init__(self, nlayers,d_input ,d_model, act_func = nn.ReLU()):
         super().__init__()
-        linear = nn.Linear(d_input,d_model)
+        linear = nn.Linear(d_input,d_model, dtype = torch.float64)
         sequence_module = OrderedDict([("input_layer", linear)])
         sequence_module.update([("hidden_actfun1", act_func)])
         for i in range(1, nlayers):
-            linear = nn.Linear(d_input,d_model) #otherwise shares same parameters
+            linear = nn.Linear(d_model,d_model, dtype =  torch.float64) #otherwise shares same parameters
             sequence_module.update([("hidden_actfun%d"%i, act_func)])
             sequence_module.update([("hidden_linear%d"%i, linear)])
         
@@ -33,20 +33,27 @@ class Embedder(nn.Module):
 #                  - for the rest, see docs at https://pytorch.org/docs/stable/generated/torch.nn.Transformer.html            
 class ClustersFinder(nn.Module):
     def __init__(self, dmodel, nhead, nhid_ff_trsf, nlayers_encoder, 
-                                                                nlayers_decoder,nlayers_embder, d_input,
+                                                                nlayers_decoder,nlayers_embder, 
+                                                                d_input_encoder: int = 6,
+                                                                d_input_decoder: int = 8,
                                                                 nparticles_max: int = 10, 
                                                                 ncharges_max: int = 3,
-                                                                DOF_continous: int = 4):
+                                                                DOF_continous: int = 3):
         
         super(ClustersFinder,self).__init__()
-        self.input_embedder = Embedder(nlayers = nlayers_embder, d_input=d_input,d_model=dmodel)
-        self.tgt_embedder = Embedder(nlayers = nlayers_embder, d_input=d_input,d_model=dmodel)
-        self.transformer = nn.Transformer(d_model=dmodel, nhead = nhead, dim_feedforward= nhid_ff_trsf,
-                                             num_encoder_layers=nlayers_encoder, num_decoder_layers=nlayers_decoder)
+        self.input_embedder = Embedder(nlayers = nlayers_embder, d_input=d_input_encoder,d_model=dmodel)
+        self.tgt_embedder = Embedder(nlayers = nlayers_embder, d_input=d_input_decoder,d_model=dmodel)
+        self.transformer = nn.Transformer(d_model=dmodel, 
+                                          nhead = nhead, 
+                                          dim_feedforward= nhid_ff_trsf,
+                                          num_encoder_layers=nlayers_encoder, 
+                                          num_decoder_layers=nlayers_decoder, 
+                                          batch_first= True,
+                                          dtype = torch.float64)
 
-        self.lastlin_charge = nn.Linear(dmodel,ncharges_max)
-        self.lastlin_pdg = nn.Linear(dmodel,nparticles_max)
-        self.lastlin_cont = nn.Linear(dmodel,DOF_continous)
+        self.lastlin_charge = nn.Linear(dmodel,ncharges_max, dtype= torch.float64)
+        self.lastlin_pdg = nn.Linear(dmodel,nparticles_max, dtype = torch.float64)
+        self.lastlin_cont = nn.Linear(dmodel,DOF_continous, dtype= torch.float64)
 
     '''forward will be called when the __call__ function of nn.Module will be called., used for training
         args:
@@ -67,7 +74,7 @@ class ClustersFinder(nn.Module):
                                   tgt_key_padding_mask = tgt_padding_mask,
                                   memory_key_padding_mask = memory_padding_mask,
                                   tgt_is_causal = True, #generates causal mask for tgt  
-                                  batch_first = True)  #batch_first to have input shape (N,S,E) or (N,T,E)
+                                  )  #batch_first to have input shape (N,S,E) or (N,T,E)
         
         return (self.lastlin_charge(output), #unnormalised probabilities for charge
                 self.lastlin_pdg(output), #unnormalised probabilities for pdg
