@@ -158,6 +158,9 @@ class CollectionHitsTraining(Dataset):
         else:
             feats = feats[:,:,:4]
 
+        PDGs_mask = np.abs(labels[...,2])
+        labels = labels[PDGs_mask]
+
         self.E_label_RMS_normalizer = RMSNormalizer()
         self.E_feats_RMS_normalizer = RMSNormalizer()
         self.pos_feats_RMS_normalizer = RMSNormalizer()
@@ -222,11 +225,6 @@ class CollectionHitsTraining(Dataset):
         self.vocab_pdgs = Vocab(abs_pdg_keys, special_tokens_CEL)
         self.labels[...,0] = self.vocab_charges.tokens_to_indices(self.labels[...,0])
         self.labels[...,1] = self.vocab_pdgs.tokens_to_indices(self.labels[...,1])
-
-        print("type of data_set =================")
-        print(self.feats.dtype)
-        print(self.labels.dtype)
-
     
     '''Keep only 1 representative of each clusters in the label dataset 
         and keep only the features (charge, pdg, m, px,py,z)'''

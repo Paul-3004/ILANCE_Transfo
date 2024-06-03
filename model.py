@@ -4,13 +4,13 @@ import torch.nn as nn
 from torch.nn.functional import softmax
 
 class Embedder(nn.Module):
-    def __init__(self, nlayers,d_input ,d_model, act_func = nn.ReLU()):
+    def __init__(self, nlayers,d_input ,d_model, device,act_func = nn.ReLU()):
         super().__init__()
-        linear = nn.Linear(d_input,d_model, dtype = torch.float64)
+        linear = nn.Linear(d_input,d_model, dtype = torch.float64, device= device)
         sequence_module = OrderedDict([("input_layer", linear)])
         sequence_module.update([("hidden_actfun1", act_func)])
         for i in range(1, nlayers):
-            linear = nn.Linear(d_model,d_model, dtype =  torch.float64) #otherwise shares same parameters
+            linear = nn.Linear(d_model,d_model, dtype =  torch.float64, device=device) #otherwise shares same parameters
             sequence_module.update([("hidden_actfun%d"%i, act_func)])
             sequence_module.update([("hidden_linear%d"%i, linear)])
         
@@ -32,28 +32,30 @@ class Embedder(nn.Module):
 #                  - d_model: shared with Embedder 
 #                  - for the rest, see docs at https://pytorch.org/docs/stable/generated/torch.nn.Transformer.html            
 class ClustersFinder(nn.Module):
-    def __init__(self, dmodel, nhead, nhid_ff_trsf, nlayers_encoder, 
+    def __init__(self, dmodel, nhead, nhid_ff_trsf, nlayers_encoder, device,
                                                                 nlayers_decoder,nlayers_embder, 
                                                                 d_input_encoder: int = 6,
                                                                 d_input_decoder: int = 8,
                                                                 nparticles_max: int = 10, 
                                                                 ncharges_max: int = 3,
-                                                                DOF_continous: int = 3):
+                                                                DOF_continous: int = 3
+                                                                ):
         
         super(ClustersFinder,self).__init__()
-        self.input_embedder = Embedder(nlayers = nlayers_embder, d_input=d_input_encoder,d_model=dmodel)
-        self.tgt_embedder = Embedder(nlayers = nlayers_embder, d_input=d_input_decoder,d_model=dmodel)
+        self.input_embedder = Embedder(nlayers = nlayers_embder, d_input=d_input_encoder,d_model=dmodel, device = device)
+        self.tgt_embedder = Embedder(nlayers = nlayers_embder, d_input=d_input_decoder,d_model=dmodel, device = device)
         self.transformer = nn.Transformer(d_model=dmodel, 
                                           nhead = nhead, 
                                           dim_feedforward= nhid_ff_trsf,
                                           num_encoder_layers=nlayers_encoder, 
                                           num_decoder_layers=nlayers_decoder, 
                                           batch_first= True,
-                                          dtype = torch.float64)
+                                          dtype = torch.float64,
+                                          device = device)
 
-        self.lastlin_charge = nn.Linear(dmodel,ncharges_max, dtype= torch.float64)
-        self.lastlin_pdg = nn.Linear(dmodel,nparticles_max, dtype = torch.float64)
-        self.lastlin_cont = nn.Linear(dmodel,DOF_continous, dtype= torch.float64)
+        self.lastlin_charge = nn.Linear(dmodel,ncharges_max, dtype= torch.float64, device = device)
+        self.lastlin_pdg = nn.Linear(dmodel,nparticles_max, dtype = torch.float64, device = device)
+        self.lastlin_cont = nn.Linear(dmodel,DOF_continous, dtype= torch.float64, device  = device)
 
     '''forward will be called when the __call__ function of nn.Module will be called., used for training
         args:

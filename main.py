@@ -10,7 +10,7 @@ from model import ClustersFinder
 from argparse import ArgumentParser
 import json
 import logging
-DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+DEVICE = torch.device('cuda:5' if torch.cuda.is_available() else 'cpu')
 
 '''
 Feeds the input to the model and outputs the translated version by a greedy algorithm. 
@@ -112,18 +112,19 @@ def inference(opts):
 
     #Creating model
     model = ClustersFinder(
-        dmodel = opts.dmodel,
-        nhead = opts.nhead,
-        nhid_ff_trsf = opts.nhid_ff_trsf,
-        nlayers_encoder= opts.nlayers_encoder,
-        nlayers_decoder= opts.nlayers_decoder,
-        nlayers_embder = opts.nlayers_embder,
-        d_input_encoder = opts.d_input_encoder,
-        d_input_decoder= opts.d_input_decoder,
+        dmodel = config["dmodel"],
+        nhead = config["nhead"],
+        nhid_ff_trsf = config["nhid_ff_trsf"],
+        nlayers_encoder= config["nlayers_encoder"],
+        nlayers_decoder= config["nlayers_decoder"],
+        nlayers_embder = config["nlayers_embder"],
+        d_input_encoder = config["d_input_encoder"],
+        d_input_decoder = config["d_input_decoder"],
         nparticles_max= len(vocab_pdgs),
         ncharges_max= len(vocab_charges),
-        DOF_continous= opts.DOF_continous
-    )
+        DOF_continous= config["output_DOF_continuous"],
+        device = DEVICE
+    ).to(DEVICE)
     #Loading weights
     model.load_state_dict(torch.load(opts.model_path))
     model.eval()
@@ -148,14 +149,12 @@ def train_epoch(model, optim, train_dl, special_symbols,vocab_charges, vocab_pdg
     for src,tgt in train_dl:
         src.to(DEVICE)
         tgt.to(DEVICE)
-        print(src.shape)
 
         src_padding_mask, tgt_padding_mask = create_mask(src,tgt,special_symbols["pad"]["cont"])
         tgt_in_padding_mask = tgt_padding_mask[:,:-1]
         tgt_out_padding_mask = tgt_padding_mask[:,1:]
 
         tgt_in = tgt[:,:-1] #sets the dimensions of transformer output -> must have the same as tgt_out
-        print(tgt_in.dtype)
         logits_charges, logits_pdg, logits_cont = model(src,tgt_in, 
                                                                     src_padding_mask,
                                                                     tgt_in_padding_mask,
@@ -277,7 +276,8 @@ def train_and_validate(config):
         d_input_decoder = config["d_input_decoder"],
         nparticles_max= len(vocab_pdgs),
         ncharges_max= len(vocab_charges),
-        DOF_continous= config["output_DOF_continuous"]
+        DOF_continous= config["output_DOF_continuous"],
+        device = DEVICE
     ).to(DEVICE)
 
 
