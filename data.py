@@ -16,7 +16,6 @@ import glob
         tgt_padding_mask: mask for the target padding tokens, shape: (N,T)'''
 def create_mask(src, tgt, pad_symbol, device):
     pad_symbol_broad = torch.tensor(pad_symbol).unsqueeze(0).unsqueeze(0).to(device)
->>>>>>> b7398e0c0d9ffc1dbfb35570f5edf2e4d13efab2
     src_padding_mask = torch.all((src[...,-2:] == pad_symbol_broad), dim = -1).to(device)
     tgt_padding_mask = torch.all((tgt[...,-2:]== pad_symbol_broad), dim = -1).to(device)
 
