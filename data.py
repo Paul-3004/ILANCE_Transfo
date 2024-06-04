@@ -14,10 +14,10 @@ import glob
     output:
         src_padding_mask: mask for the source padding tokens, shape: (N,S)
         tgt_padding_mask: mask for the target padding tokens, shape: (N,T)'''
-def create_mask(src, tgt, pad_symbol):
+def create_mask(src, tgt, pad_symbol, device):
     pad_symbol_broad = torch.tensor(pad_symbol).unsqueeze(0).unsqueeze(0)
-    src_padding_mask = torch.all((src[...,-2:] == pad_symbol_broad), dim = -1)
-    tgt_padding_mask = torch.all((tgt[...,-2:]== pad_symbol_broad), dim = -1)
+    src_padding_mask = torch.all((src[...,-2:] == pad_symbol_broad), dim = -1).to(device)
+    tgt_padding_mask = torch.all((tgt[...,-2:]== pad_symbol_broad), dim = -1).to(device)
 
     return src_padding_mask, tgt_padding_mask
 
