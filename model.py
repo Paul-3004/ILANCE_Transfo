@@ -81,6 +81,7 @@ class ClustersFinder(nn.Module):
                                   src_key_padding_mask = src_padding_mask, 
                                   tgt_key_padding_mask = tgt_padding_mask,
                                   memory_key_padding_mask = memory_padding_mask,
+                                  tgt_mask = self.transformer.generate_square_subsequent_mask(tgt.shape[1],device = self.device),
                                   tgt_is_causal = True, #generates causal mask for tgt  
                                   ).to(self.device)
         
@@ -111,6 +112,7 @@ class ClustersFinder(nn.Module):
     '''
     def decode(self, tgt, memory, tgt_key_padding_mask, memory_key_padding_mask):
         return self.transformer.decoder(self.tgt_embedder(tgt), memory, 
+                                        tgt_mask = self.transformer.generate_square_subsequent_mask(tgt.shape[1],device = self.device),
                                         tgt_is_causal = True, #generates tgt_mask causal 
                                         tgt_key_padding_mask = tgt_key_padding_mask,
                                         memory_key_padding_mask = memory_key_padding_mask)
