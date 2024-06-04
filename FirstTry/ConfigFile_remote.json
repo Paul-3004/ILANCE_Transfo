@@ -19,5 +19,6 @@
     "nlayers_embder": 2,
     "d_input_encoder": 6,
     "d_input_decoder": 8,
-    "output_DOF_continuous": 3
+    "output_DOF_continuous": 3,
+    "dtype": "torch.float32"
 }
