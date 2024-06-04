@@ -150,7 +150,7 @@ def train_epoch(model, optim, train_dl, special_symbols,vocab_charges, vocab_pdg
         src.to(DEVICE)
         tgt.to(DEVICE)
 
-        src_padding_mask, tgt_padding_mask = create_mask(src,tgt,special_symbols["pad"]["cont"])
+        src_padding_mask, tgt_padding_mask = create_mask(src,tgt,special_symbols["pad"]["cont"], DEVICE)
         tgt_in_padding_mask = tgt_padding_mask[:,:-1]
         tgt_out_padding_mask = tgt_padding_mask[:,1:]
 
