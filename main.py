@@ -188,7 +188,7 @@ def train_epoch(model, optim, train_dl, special_symbols,vocab_charges, vocab_pdg
         loss_cont = torch.mean(loss_cont_vec * n_nospe)
 
         loss_vec = torch.tensor([loss_charges,loss_pdg, loss_cont], requires_grad = True)
-        loss = torch.dot(torch.tensor(hyperweights_lossfn, dtype = torch.float64),loss_vec)
+        loss = torch.dot(torch.tensor(hyperweights_lossfn, dtype = model.dtype),loss_vec)
         logging.info("Backward propagation...")
         loss.backward()
         optim.step()
@@ -263,6 +263,8 @@ def train_and_validate(config):
     
     logging.info("Loaded the data and saved vocabularies")
     #Creating model
+    if config["dtype"] == "torch.float32":
+        dtype = torch.float32
     model = ClustersFinder(
         dmodel = config["dmodel"],
         nhead = config["nhead"],
@@ -275,7 +277,8 @@ def train_and_validate(config):
         nparticles_max= len(vocab_pdgs),
         ncharges_max= len(vocab_charges),
         DOF_continous= config["output_DOF_continuous"],
-        device = DEVICE
+        device = DEVICE,
+        dtype = dtype
     ).to(DEVICE)
 
 

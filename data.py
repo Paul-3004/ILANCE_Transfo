@@ -214,8 +214,8 @@ class CollectionHitsTraining(Dataset):
         feats = ak.concatenate([ak.singletons(E_feat,axis = -1), pos], axis = -1)
         #Adding special symbols
         add_special_symbols = AddSpecialSymbols(special_symbols)
-        self.feats = torch.from_numpy(ak.to_numpy(add_special_symbols(feats, "feats")))
-        self.labels = torch.from_numpy(ak.to_numpy(add_special_symbols(labels, "labels")))
+        self.feats = torch.from_numpy(ak.to_numpy(add_special_symbols(feats, "feats"))).to(dtype = torch.float32)
+        self.labels = torch.from_numpy(ak.to_numpy(add_special_symbols(labels, "labels"))).to(dtype = torch.float32)
 
         #Creating vocabularies:
         charges_keys = np.unique(ak.to_numpy(ak.flatten(charges))).tolist()
