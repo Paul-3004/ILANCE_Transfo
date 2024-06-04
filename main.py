@@ -220,20 +220,18 @@ def validate_epoch(model, val_dl, special_symbols,vocab_charges, vocab_pdgs,
         tgt_out = tgt[:,1:,:] #logits are compared with tokens shifted
         tgt_out_charges = tgt_out[...,0].to(torch.long)
         tgt_out_pdg = tgt_out[...,1].to(torch.long)
-        tgt_out_cont = tgt_out[...,2:-2] #only (E, theta, phi)
+        tgt_out_cont = tgt_out[...,2:-2] #only (E, n_x,n_y,n_z)
         #Using spherical coordinates to get 3D direction vectors
-        tgt_out_sin_theta = torch.sin(tgt_out_cont[...,1])
-        tgt_out_cont[...,1] = torch.cos(tgt_out_cont[...,2]) * tgt_out_sin_theta
-        tgt_out_cont[...,2] = torch.sin(tgt_out_cont[...,2]) * tgt_out_sin_theta
-        tgt_out_cont = torch.concat([tgt_out_cont, torch.cos(tgt_out_cont[...,1]).unsqueeze_(-1)], dim = -1)
-        #setting values of special tokens to 0 so that it doesn't contribute to loss
-        tgt_out_cont[tgt_out_padding_mask] = 0.
-        logits_cont[tgt_out_padding_mask] = 0.
+        logits_cont_sin_theta = torch.sin(tgt_out_cont[...,1]) #logits: (E, theta, phi)
+        logits_cont[...,1] = torch.cos(logits_cont[...,2]) * logits_cont_sin_theta
+        logits_cont[...,2] = torch.sin(logits_cont[...,2]) * logits_cont_sin_theta
+        logits_cont = torch.concat([logits_cont, torch.cos(logits_cont[...,1]).unsqueeze_(-1)], dim = -1)
         #special_tokens are not taken into account in the continuous loss
         eos_bos_mask = ((tgt_out_charges == vocab_charges.get_index(special_symbols["eos"]["CEL"])) 
                         + (tgt_out_charges == vocab_charges.get_index(special_symbols["bos"]["CEL"]))) 
         spe_tokens_mask = eos_bos_mask + tgt_out_padding_mask
         logits_cont[spe_tokens_mask] = 0.
+        tgt_out_cont[spe_tokens_mask] = 0.
         
         #Computing the losses
         logging.info("Computing the losses, validation set")
