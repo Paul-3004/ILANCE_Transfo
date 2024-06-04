@@ -133,7 +133,7 @@ def inference(opts):
 
     
     for src in src_loader:
-        src_padding_mask, _ = create_mask(src,torch.tensor([0]), special_symbols["pad"]["cont"],device)
+        src_padding_mask, _ = create_mask(src,torch.tensor([0]), special_symbols["pad"]["cont"],DEVICE)
         clusters_out = greedy_func(model, src,src_padding_mask,opts.ncluster_max,special_symbols,opts.nfeats_labels)
         clusters_out[...,0] = vocab_charges.indices_to_tokens(clusters_out[...,0])
         clusters_out[...,1] = vocab_pdgs.indices_to_tokens(clusters_out[...,1]) 
