@@ -163,8 +163,8 @@ def train_epoch(model, optim, train_dl, special_symbols,vocab_charges, vocab_pdg
         optim.zero_grad()
 
         tgt_out = tgt[:,1:,:] #logits are compared with tokens shifted
-        tgt_out_charges = tgt_out[...,0]
-        tgt_out_pdg = tgt_out[...,1]
+        tgt_out_charges = tgt_out[...,0].to(torch.long)
+        tgt_out_pdg = tgt_out[...,1].to(torch.long)
         tgt_out_cont = tgt_out[...,2:-2] #only (E, theta, phi)
         #Using spherical coordinates to get 3D direction vectors
         tgt_out_sin_theta = torch.sin(tgt_out_cont[...,1])
