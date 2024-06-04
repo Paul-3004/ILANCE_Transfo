@@ -181,10 +181,10 @@ def train_epoch(model, optim, train_dl, special_symbols,vocab_charges, vocab_pdg
         logits_cont[spe_tokens_mask] = 0.
         
         #Computing the losses
-        logging.info("Computing the losses")
+        logging.info("Computing the losses, training")
         loss_charges = loss_fn_charges(logits_charges.transpose(dim0 = -2, dim1 = -1), tgt_out_charges)
         loss_pdg = loss_fn_pdg(logits_pdg.transpose(dim0 = -2, dim1 = -1), tgt_out_pdg)
-        loss_cont_vec = loss_fn_cont(logits_cont, tgt_out_cont, reduction = 'none')
+        loss_cont_vec = loss_fn_cont(logits_cont, tgt_out_cont)
         nspe_tokens = torch.count_nonzero(spe_tokens_mask, dim = -1)
         n_nospe = spe_tokens_mask.shape[-1] - nspe_tokens
         loss_cont = torch.mean(loss_cont_vec * n_nospe)
@@ -204,10 +204,10 @@ def validate_epoch(model, val_dl, special_symbols,vocab_charges, vocab_pdgs,
     model.eval() #setting model into train mode
     loss_epoch = 0.0
     for src,tgt in val_dl:
-        src.to(DEVICE)
-        tgt.to(DEVICE)
+        src = src.to(DEVICE)
+        tgt = tgt.to(DEVICE)
 
-        src_padding_mask, tgt_padding_mask = create_mask(src,tgt,special_symbols["pad"]["cont"])
+        src_padding_mask, tgt_padding_mask = create_mask(src,tgt,special_symbols["pad"]["cont"], DEVICE)
         tgt_in_padding_mask = tgt_padding_mask[:,:-1]
         tgt_out_padding_mask = tgt_padding_mask[:,1:]
 
@@ -218,8 +218,8 @@ def validate_epoch(model, val_dl, special_symbols,vocab_charges, vocab_pdgs,
                                                                     src_padding_mask)
 
         tgt_out = tgt[:,1:,:] #logits are compared with tokens shifted
-        tgt_out_charges = tgt_out[...,0]
-        tgt_out_pdg = tgt_out[...,1]
+        tgt_out_charges = tgt_out[...,0].to(torch.long)
+        tgt_out_pdg = tgt_out[...,1].to(torch.long)
         tgt_out_cont = tgt_out[...,2:-2] #only (E, theta, phi)
         #Using spherical coordinates to get 3D direction vectors
         tgt_out_sin_theta = torch.sin(tgt_out_cont[...,1])
@@ -236,9 +236,10 @@ def validate_epoch(model, val_dl, special_symbols,vocab_charges, vocab_pdgs,
         logits_cont[spe_tokens_mask] = 0.
         
         #Computing the losses
+        logging.info("Computing the losses, validation set")
         loss_charges = loss_fn_charges(logits_charges.transpose(dim0 = -2, dim1 = -1), tgt_out_charges)
         loss_pdg = loss_fn_pdg(logits_pdg.transpose(dim0 = -2, dim1 = -1), tgt_out_pdg)
-        loss_cont_vec = loss_fn_cont(logits_cont, tgt_out_cont, reduction = 'none')
+        loss_cont_vec = loss_fn_cont(logits_cont, tgt_out_cont)
         nspe_tokens = torch.count_nonzero(spe_tokens_mask, dim = -1)
         n_nospe = spe_tokens_mask.shape[-1] - nspe_tokens
         loss_cont = torch.mean(loss_cont_vec * n_nospe)
@@ -289,7 +290,7 @@ def train_and_validate(config):
     optim = torch.optim.Adam(model.parameters(), lr = config["lr"])
     loss_fn_charges = nn.CrossEntropyLoss(ignore_index=vocab_charges.get_index(special_symbols["pad"]["CEL"]), reduction ='mean')
     loss_fn_pdgs = nn.CrossEntropyLoss(ignore_index=vocab_pdgs.get_index(special_symbols["pad"]["CEL"]), reduction ='mean')
-    loss_fn_cont = nn.MSELoss()
+    loss_fn_cont = nn.MSELoss(reduction = 'none')
 
     val_loss_min = 1e9
     nepoch = config["epochs"]
@@ -309,6 +310,7 @@ def train_and_validate(config):
                                        loss_fn_pdg= loss_fn_pdgs,
                                        loss_fn_cont= loss_fn_cont)
         time_epoch = start_time - time() 
+        logging.info("Finished training for one epoch, going to valiation")
         val_loss_epoch = validate_epoch(model,
                                        val_dl=val_dl,
                                        hyperweights_lossfn= config["hyper_loss"],
@@ -341,7 +343,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    with open(args.config_path + "ConfigFile.json") as f:
+    with open(args.config_path + "ConfigFile_remote.json") as f:
         config = json.load(f)
 
     if args.inference:
