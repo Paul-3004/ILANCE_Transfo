@@ -187,8 +187,8 @@ def train_epoch(model, optim, train_dl, special_symbols,vocab_charges, vocab_pdg
         n_nospe = spe_tokens_mask.shape[-1] - nspe_tokens
         loss_cont = torch.mean(loss_cont_vec * n_nospe)
 
-        loss_vec = torch.tensor([loss_charges,loss_pdg, loss_cont])
-        loss = torch.dot(torch.tensor(hyperweights_lossfn),loss_vec)
+        loss_vec = torch.tensor([loss_charges,loss_pdg, loss_cont], requires_grad = True)
+        loss = torch.dot(torch.tensor(hyperweights_lossfn, dtype = torch.float64),loss_vec)
         logging.info("Backward propagation...")
         loss.backward()
         optim.step()
@@ -241,7 +241,7 @@ def validate_epoch(model, val_dl, special_symbols,vocab_charges, vocab_pdgs,
         loss_cont = torch.mean(loss_cont_vec * n_nospe)
 
         loss_vec = torch.tensor([loss_charges,loss_pdg, loss_cont])
-        loss = torch.dot(torch.tensor(hyperweights_lossfn),loss_vec)
+        loss = torch.dot(torch.tensor(hyperweights_lossfn, dtype = torch.float64),loss_vec)
 
         loss_epoch += loss.item()
 
