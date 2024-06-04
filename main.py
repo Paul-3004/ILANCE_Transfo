@@ -133,7 +133,7 @@ def inference(opts):
 
     
     for src in src_loader:
-        src_padding_mask, _ = create_mask(src,torch.tensor([0]), special_symbols["pad"]["cont"])
+        src_padding_mask, _ = create_mask(src,torch.tensor([0]), special_symbols["pad"]["cont"],device)
         clusters_out = greedy_func(model, src,src_padding_mask,opts.ncluster_max,special_symbols,opts.nfeats_labels)
         clusters_out[...,0] = vocab_charges.indices_to_tokens(clusters_out[...,0])
         clusters_out[...,1] = vocab_pdgs.indices_to_tokens(clusters_out[...,1]) 
@@ -147,9 +147,10 @@ def train_epoch(model, optim, train_dl, special_symbols,vocab_charges, vocab_pdg
     model.train() #setting model into train mode
     loss_epoch = 0.0
     for src,tgt in train_dl:
-        src.to(DEVICE)
-        tgt.to(DEVICE)
-
+        src = src.to(DEVICE)
+        tgt = tgt.to(DEVICE)
+        print("src device abefore call")
+        print(src.device)
         src_padding_mask, tgt_padding_mask = create_mask(src,tgt,special_symbols["pad"]["cont"], DEVICE)
         tgt_in_padding_mask = tgt_padding_mask[:,:-1]
         tgt_out_padding_mask = tgt_padding_mask[:,1:]
@@ -284,7 +285,7 @@ def train_and_validate(config):
     
     
     logging.info("Created model, now training")
-
+    print(f"DEVICE: {DEVICE}") 
     optim = torch.optim.Adam(model.parameters(), lr = config["lr"])
     loss_fn_charges = nn.CrossEntropyLoss(ignore_index=vocab_charges.get_index(special_symbols["pad"]["CEL"]), reduction ='mean')
     loss_fn_pdgs = nn.CrossEntropyLoss(ignore_index=vocab_pdgs.get_index(special_symbols["pad"]["CEL"]), reduction ='mean')
