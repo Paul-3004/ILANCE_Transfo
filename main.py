@@ -147,51 +147,46 @@ def train_epoch(model, optim, train_dl, special_symbols,vocab_charges, vocab_pdg
     model.train() #setting model into train mode
     loss_epoch = 0.0
     for src,tgt in train_dl:
-        with torch.autograd.set_detect_anomaly(True):
-            src = src.to(DEVICE)
-            tgt = tgt.to(DEVICE)
-            print(f"allocated memory on GPU after moving: {torch.cuda.memory_allocated(device = DEVICE)}")
-            src_padding_mask, tgt_padding_mask = create_mask(src,tgt,special_symbols["pad"]["cont"], DEVICE)
-            tgt_in_padding_mask = tgt_padding_mask[:,:-1]
-            tgt_out_padding_mask = tgt_padding_mask[:,1:]
-
-            tgt_in = tgt[:,:-1] #sets the dimensions of transformer output -> must have the same as tgt_out
-            logits_charges, logits_pdg, logits_cont = model(src,tgt_in, 
-                                                                    src_padding_mask,
-                                                                    tgt_in_padding_mask,
-                                                                    src_padding_mask)
-            optim.zero_grad()
-
-            tgt_out = tgt[:,1:,:] #logits are compared with tokens shifted
-            tgt_out_charges = tgt_out[...,0].to(torch.long)
-            tgt_out_pdg = tgt_out[...,1].to(torch.long)
-            tgt_out_cont = tgt_out[...,2:-2] #only (E, n_x,n_y,n_z)
-            #Using spherical coordinates to get 3D direction vectors
-            logits_cont_sin_theta = torch.sin(logits_cont[...,-2]) #logits: (E, theta, phi)
-            logits_cont_nx = torch.cos(logits_cont[...,-1]) * logits_cont_sin_theta
-            logits_cont_ny = torch.sin(logits_cont[...,2]) * logits_cont_sin_theta
-            logits_cont = torch.concat([logits_cont[...,0].unsqueeze(-1),logits_cont_nx.unsqueeze(-1),logits_cont_ny.unsqueeze(-1),  torch.cos(logits_cont[...,1]).unsqueeze(-1)], dim = -1)
-            #special_tokens are not taken into account in the continuous loss
-            eos_bos_mask = ((tgt_out_charges == vocab_charges.get_index(special_symbols["eos"]["CEL"]))
-                            + (tgt_out_charges == vocab_charges.get_index(special_symbols["bos"]["CEL"]))) 
-            spe_tokens_mask = eos_bos_mask + tgt_out_padding_mask
-
-            #Computing the losses
-            logging.info("Computing the losses, training")
-            loss_charges = loss_fn_charges(logits_charges.transpose(dim0 = -2, dim1 = -1), tgt_out_charges)
-            loss_pdg = loss_fn_pdg(logits_pdg.transpose(dim0 = -2, dim1 = -1), tgt_out_pdg)
-            loss_cont_vec = loss_fn_cont(logits_cont, tgt_out_cont)
-            #nspe_tokens = torch.count_nonzero(spe_tokens_mask, dim = -1)
-            #n_nospe = spe_tokens_mask.shape[-1] - nspe_tokens
-            loss_cont = torch.mean(loss_cont_vec[~spe_tokens_mask])
-            
-            loss = loss_charges * hyperweights_lossfn[0] + loss_pdg * hyperweights_lossfn[1] + loss_cont*hyperweights_lossfn[2]
-            logging.info("Backward propagation...")
-            loss.backward()
-            optim.step()
-            
-
-            loss_epoch += loss.item()
+        src = src.to(DEVICE)
+        tgt = tgt.to(DEVICE)
+        print(f"allocated memory on GPU after moving: {torch.cuda.memory_allocated(device = DEVICE)}")
+        src_padding_mask, tgt_padding_mask = create_mask(src,tgt,special_symbols["pad"]["cont"], DEVICE)
+        tgt_in_padding_mask = tgt_padding_mask[:,:-1]
+        tgt_out_padding_mask = tgt_padding_mask[:,1:]
+        tgt_in = tgt[:,:-1] #sets the dimensions of transformer output -> must have the same as tgt_out
+        logits_charges, logits_pdg, logits_cont = model(src,tgt_in, 
+                                                                src_padding_mask,
+                                                                tgt_in_padding_mask,
+                                                                src_padding_mask)
+        optim.zero_grad()
+        tgt_out = tgt[:,1:,:] #logits are compared with tokens shifted
+        tgt_out_charges = tgt_out[...,0].to(torch.long)
+        tgt_out_pdg = tgt_out[...,1].to(torch.long)
+        tgt_out_cont = tgt_out[...,2:-2] #only (E, n_x,n_y,n_z)
+        #Using spherical coordinates to get 3D direction vectors
+        logits_cont_sin_theta = torch.sin(logits_cont[...,-2]) #logits: (E, theta, phi)
+        logits_cont_nx = torch.cos(logits_cont[...,-1]) * logits_cont_sin_theta
+        logits_cont_ny = torch.sin(logits_cont[...,2]) * logits_cont_sin_theta
+        logits_cont = torch.concat([logits_cont[...,0].unsqueeze(-1),logits_cont_nx.unsqueeze(-1),logits_cont_ny.unsqueeze(-1),  torch.cos(logits_cont[...,1]).unsqueeze(-1)], dim = -1)
+        #special_tokens are not taken into account in the continuous loss
+        eos_bos_mask = ((tgt_out_charges == vocab_charges.get_index(special_symbols["eos"]["CEL"]))
+                        + (tgt_out_charges == vocab_charges.get_index(special_symbols["bos"]["CEL"]))) 
+        spe_tokens_mask = eos_bos_mask + tgt_out_padding_mask
+        #Computing the losses
+        logging.info("Computing the losses, training")
+        loss_charges = loss_fn_charges(logits_charges.transpose(dim0 = -2, dim1 = -1), tgt_out_charges)
+        loss_pdg = loss_fn_pdg(logits_pdg.transpose(dim0 = -2, dim1 = -1), tgt_out_pdg)
+        loss_cont_vec = loss_fn_cont(logits_cont, tgt_out_cont)
+        #nspe_tokens = torch.count_nonzero(spe_tokens_mask, dim = -1)
+        #n_nospe = spe_tokens_mask.shape[-1] - nspe_tokens
+        loss_cont = torch.mean(loss_cont_vec[~spe_tokens_mask])
+        
+        loss = loss_charges * hyperweights_lossfn[0] + loss_pdg * hyperweights_lossfn[1] + loss_cont*hyperweights_lossfn[2]
+        logging.info("Backward propagation...")
+        loss.backward()
+        optim.step()
+        
+        loss_epoch += loss.item()
 
     return loss_epoch / len(list(train_dl))
 
@@ -200,47 +195,45 @@ def validate_epoch(model, val_dl, special_symbols,vocab_charges, vocab_pdgs,
     model.eval() #setting model into train mode
     loss_epoch = 0.0
     for src,tgt in val_dl:
-        src = src.to(DEVICE)
+                src = src.to(DEVICE)
         tgt = tgt.to(DEVICE)
-
+        print(f"allocated memory on GPU after moving: {torch.cuda.memory_allocated(device = DEVICE)}")
         src_padding_mask, tgt_padding_mask = create_mask(src,tgt,special_symbols["pad"]["cont"], DEVICE)
         tgt_in_padding_mask = tgt_padding_mask[:,:-1]
         tgt_out_padding_mask = tgt_padding_mask[:,1:]
-
         tgt_in = tgt[:,:-1] #sets the dimensions of transformer output -> must have the same as tgt_out
         logits_charges, logits_pdg, logits_cont = model(src,tgt_in, 
-                                                                    src_padding_mask,
-                                                                    tgt_in_padding_mask,
-                                                                    src_padding_mask)
-
+                                                                src_padding_mask,
+                                                                tgt_in_padding_mask,
+                                                                src_padding_mask)
+        optim.zero_grad()
         tgt_out = tgt[:,1:,:] #logits are compared with tokens shifted
         tgt_out_charges = tgt_out[...,0].to(torch.long)
         tgt_out_pdg = tgt_out[...,1].to(torch.long)
         tgt_out_cont = tgt_out[...,2:-2] #only (E, n_x,n_y,n_z)
         #Using spherical coordinates to get 3D direction vectors
-        logits_cont_sin_theta = torch.sin(tgt_out_cont[...,1]) #logits: (E, theta, phi)
-        logits_cont[...,1] = torch.cos(logits_cont[...,2]) * logits_cont_sin_theta
-        logits_cont[...,2] = torch.sin(logits_cont[...,2]) * logits_cont_sin_theta
-        logits_cont = torch.concat([logits_cont, torch.cos(logits_cont[...,1]).unsqueeze_(-1)], dim = -1)
+        logits_cont_sin_theta = torch.sin(logits_cont[...,-2]) #logits: (E, theta, phi)
+        logits_cont_nx = torch.cos(logits_cont[...,-1]) * logits_cont_sin_theta
+        logits_cont_ny = torch.sin(logits_cont[...,2]) * logits_cont_sin_theta
+        logits_cont = torch.concat([logits_cont[...,0].unsqueeze(-1),
+                                    logits_cont_nx.unsqueeze(-1),
+                                    logits_cont_ny.unsqueeze(-1),  
+                                    torch.cos(logits_cont[...,1]).unsqueeze(-1)], 
+                                    dim = -1)
         #special_tokens are not taken into account in the continuous loss
-        eos_bos_mask = ((tgt_out_charges == vocab_charges.get_index(special_symbols["eos"]["CEL"])) 
+        eos_bos_mask = ((tgt_out_charges == vocab_charges.get_index(special_symbols["eos"]["CEL"]))
                         + (tgt_out_charges == vocab_charges.get_index(special_symbols["bos"]["CEL"]))) 
         spe_tokens_mask = eos_bos_mask + tgt_out_padding_mask
-        logits_cont[spe_tokens_mask] = 0.
-        tgt_out_cont[spe_tokens_mask] = 0.
-        
         #Computing the losses
-        logging.info("Computing the losses, validation set")
+        logging.info("Computing the losses, training")
         loss_charges = loss_fn_charges(logits_charges.transpose(dim0 = -2, dim1 = -1), tgt_out_charges)
         loss_pdg = loss_fn_pdg(logits_pdg.transpose(dim0 = -2, dim1 = -1), tgt_out_pdg)
         loss_cont_vec = loss_fn_cont(logits_cont, tgt_out_cont)
-        nspe_tokens = torch.count_nonzero(spe_tokens_mask, dim = -1)
-        n_nospe = spe_tokens_mask.shape[-1] - nspe_tokens
-        loss_cont = torch.mean(loss_cont_vec * n_nospe)
-
-        loss_vec = torch.tensor([loss_charges,loss_pdg, loss_cont])
-        loss = torch.dot(torch.tensor(hyperweights_lossfn, dtype = torch.float64),loss_vec)
-
+        #nspe_tokens = torch.count_nonzero(spe_tokens_mask, dim = -1)
+        #n_nospe = spe_tokens_mask.shape[-1] - nspe_tokens
+        loss_cont = torch.mean(loss_cont_vec[~spe_tokens_mask])
+        
+        loss = loss_charges * hyperweights_lossfn[0] + loss_pdg * hyperweights_lossfn[1] + loss_cont*hyperweights_lossfn[2]
         loss_epoch += loss.item()
 
     return loss_epoch / len(list(val_dl))
