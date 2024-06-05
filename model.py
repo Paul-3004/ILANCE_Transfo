@@ -78,13 +78,16 @@ class ClustersFinder(nn.Module):
                                   src_key_padding_mask = src_padding_mask, 
                                   tgt_key_padding_mask = tgt_padding_mask,
                                   memory_key_padding_mask = memory_padding_mask,
-                                  tgt_mask = self.transformer.generate_square_subsequent_mask(tgt.shape[1], device = self.device),
+                                  tgt_mask = self.generate_causal_mask(tgt.shape[1], device = self.device),
                                   tgt_is_causal = True, #generates causal mask for tgt  
                                   )
         
         return (self.lastlin_charge(output), #unnormalised probabilities for charge
                 self.lastlin_pdg(output), #unnormalised probabilities for pdg
                 self.lastlin_cont(output) ) #Continuous regression
+
+    def	generate_causal_mask(self,sz, device):
+        return torch.triu(torch.ones(sz,sz), diagonal = 1).type(torch.bool).to(device = device)
     
     '''Used during inference. Input: source batch,
                               returns: memory: output of the transformer's encoder 
@@ -109,7 +112,7 @@ class ClustersFinder(nn.Module):
     '''
     def decode(self, tgt, memory, tgt_key_padding_mask, memory_key_padding_mask):
         return self.transformer.decoder(self.tgt_embedder(tgt), memory, 
-                                        tgt_mask = self.transformer.generate_square_subsequent_mask(tgt.shape[1],device = self.device),
+                                        tgt_mask = self.generate_causal_mask(tgt.shape[1],device = self.device),
                                         tgt_is_causal = True, #generates tgt_mask causal 
                                         tgt_key_padding_mask = tgt_key_padding_mask,
                                         memory_key_padding_mask = memory_key_padding_mask)
