@@ -676,3 +676,1186 @@ INFO:root:Computing the losses, training
 INFO:root:Backward propagation...
 INFO:root:Computing the losses, training
 INFO:root:Backward propagation...
+INFO:root:Getting the training data from/data/suehara/mldata/pfa/ntau_10to100GeV_10/train
+INFO:root:Loaded the data and saved vocabularies
+INFO:root:Created model, now training
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:Getting the training data from/data/suehara/mldata/pfa/ntau_10to100GeV_10/train
+INFO:root:Loaded the data and saved vocabularies
+INFO:root:Created model, now training
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:Computing the losses, training
+INFO:root:Getting the training data from/data/suehara/mldata/pfa/ntau_10to100GeV_10/train
+INFO:root:Loaded the data and saved vocabularies
+INFO:root:Created model, now training
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:New best Model, saving...
+INFO:root:1 epoch done, time: -57.23639941215515, val_loss: 3.1531484603881834, train_loss: 3.511224460601807
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:New best Model, saving...
+INFO:root:2 epoch done, time: -56.95325756072998, val_loss: 3.0972824573516844, train_loss: 3.16346333026886
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:New best Model, saving...
+INFO:root:3 epoch done, time: -57.238285541534424, val_loss: 3.1024613618850707, train_loss: 3.122200584411621
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:New best Model, saving...
+INFO:root:4 epoch done, time: -57.36471509933472, val_loss: 3.089337682723999, train_loss: 3.100341534614563
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:New best Model, saving...
+INFO:root:5 epoch done, time: -57.43296957015991, val_loss: 3.0827849388122557, train_loss: 3.1000767946243286
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:New best Model, saving...
+INFO:root:6 epoch done, time: -57.4692325592041, val_loss: 3.07623176574707, train_loss: 3.0927000761032106
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:New best Model, saving...
+INFO:root:7 epoch done, time: -57.48593997955322, val_loss: 3.0711127519607544, train_loss: 3.089243841171265
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:New best Model, saving...
+INFO:root:8 epoch done, time: -57.49847936630249, val_loss: 3.0693800926208494, train_loss: 3.0849726676940916
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:New best Model, saving...
+INFO:root:9 epoch done, time: -57.50827074050903, val_loss: 3.0685000896453856, train_loss: 3.0774428606033326
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:New best Model, saving...
+INFO:root:10 epoch done, time: -57.52275347709656, val_loss: 3.06637647151947, train_loss: 3.0738348960876465
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:New best Model, saving...
+INFO:root:11 epoch done, time: -57.53742432594299, val_loss: 3.057723808288574, train_loss: 3.071978735923767
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:New best Model, saving...
+INFO:root:12 epoch done, time: -57.53668141365051, val_loss: 3.0181921482086183, train_loss: 3.0527625560760496
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:New best Model, saving...
+INFO:root:13 epoch done, time: -57.55272936820984, val_loss: 3.004578375816345, train_loss: 3.0303799867630006
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:New best Model, saving...
+INFO:root:14 epoch done, time: -57.54346799850464, val_loss: 2.966062378883362, train_loss: 3.014444375038147
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:New best Model, saving...
+INFO:root:15 epoch done, time: -57.53980374336243, val_loss: 2.9244229555130006, train_loss: 2.971452784538269
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:New best Model, saving...
+INFO:root:16 epoch done, time: -57.54201889038086, val_loss: 2.9121477365493775, train_loss: 2.944769096374512
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:New best Model, saving...
+INFO:root:17 epoch done, time: -57.5352144241333, val_loss: 2.872714400291443, train_loss: 2.9002904415130617
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:New best Model, saving...
+INFO:root:18 epoch done, time: -57.544103145599365, val_loss: 2.867788887023926, train_loss: 2.864070272445679
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:Computing the losses, training
+INFO:root:New best Model, saving...
+INFO:root:19 epoch done, time: -57.52260184288025, val_loss: 2.834204840660095, train_loss: 2.853263831138611
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Computing the losses, training
+INFO:root:Backward propagation...
+INFO:root:Getting the training data from/data/suehara/mldata/pfa/ntau_10to100GeV_10/train
+INFO:root:Loaded the data and saved vocabularies
+INFO:root:Created model, now training
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:New best Model, saving...
+INFO:root:1 epoch done, time: 57.2130024433136, val_loss: 3.1855347871780397, train_loss: 3.620147132873535
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:New best Model, saving...
+INFO:root:2 epoch done, time: 56.95615863800049, val_loss: 3.0882675886154174, train_loss: 3.166043186187744
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:New best Model, saving...
+INFO:root:3 epoch done, time: 57.294663429260254, val_loss: 3.0917786598205566, train_loss: 3.113096332550049
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:New best Model, saving...
+INFO:root:4 epoch done, time: 57.42910385131836, val_loss: 3.0788931608200074, train_loss: 3.095836114883423
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:New best Model, saving...
+INFO:root:5 epoch done, time: 57.497897148132324, val_loss: 3.0766685724258425, train_loss: 3.0899789571762084
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:New best Model, saving...
+INFO:root:6 epoch done, time: 57.535139322280884, val_loss: 3.0720238208770754, train_loss: 3.085255169868469
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:New best Model, saving...
+INFO:root:7 epoch done, time: 57.60017204284668, val_loss: 3.0606609344482423, train_loss: 3.0833207845687864
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:New best Model, saving...
+INFO:root:8 epoch done, time: 57.58016848564148, val_loss: 3.0333638906478884, train_loss: 3.0565656185150147
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:New best Model, saving...
+INFO:root:9 epoch done, time: 57.593080282211304, val_loss: 3.0263789653778077, train_loss: 3.039104175567627
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:New best Model, saving...
+INFO:root:10 epoch done, time: 57.60387206077576, val_loss: 3.0223000049591064, train_loss: 3.0285365343093873
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:New best Model, saving...
+INFO:root:11 epoch done, time: 57.61271548271179, val_loss: 3.0197332859039308, train_loss: 3.0254318475723267
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:New best Model, saving...
+INFO:root:12 epoch done, time: 57.62682223320007, val_loss: 3.0199004650115966, train_loss: 3.0169464111328126
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:New best Model, saving...
+INFO:root:13 epoch done, time: 57.62046957015991, val_loss: 3.0208881378173826, train_loss: 3.0156287431716917
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:New best Model, saving...
+INFO:root:14 epoch done, time: 57.630640268325806, val_loss: 3.002681756019592, train_loss: 3.0142508029937742
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:New best Model, saving...
+INFO:root:15 epoch done, time: 57.62309503555298, val_loss: 2.9726722478866576, train_loss: 2.995899701118469
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:New best Model, saving...
+INFO:root:16 epoch done, time: 57.64155578613281, val_loss: 2.9555039167404176, train_loss: 2.9791473865509035
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:New best Model, saving...
+INFO:root:17 epoch done, time: 57.645729780197144, val_loss: 2.9194500923156737, train_loss: 2.9640866994857786
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:New best Model, saving...
+INFO:root:18 epoch done, time: 57.64516067504883, val_loss: 2.8715492248535157, train_loss: 2.9191520690917967
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:New best Model, saving...
+INFO:root:19 epoch done, time: 57.64518070220947, val_loss: 2.849843454360962, train_loss: 2.8807998180389403
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:New best Model, saving...
+INFO:root:20 epoch done, time: 57.63694977760315, val_loss: 2.8599254846572877, train_loss: 2.861004590988159
+INFO:root:Finished all epochs and saved the losses

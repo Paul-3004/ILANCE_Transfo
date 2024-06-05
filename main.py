@@ -4,6 +4,7 @@ import torch
 from torch.nn.functional import normalize
 import torch.nn as nn
 import torch.optim as optim
+import numpy as np
 
 from data import create_mask, get_data, Vocab
 from model import ClustersFinder
@@ -146,6 +147,9 @@ def train_epoch(model, optim, train_dl, special_symbols,vocab_charges, vocab_pdg
           hyperweights_lossfn, loss_fn_charges, loss_fn_pdg,loss_fn_cont):
     model.train() #setting model into train mode
     loss_epoch = 0.0
+    loss_epoch_charges = 0.0
+    loss_epoch_pdgs = 0.0
+    loss_epoch_cont = 0.0
     for src,tgt in train_dl:
         src = src.to(DEVICE)
         tgt = tgt.to(DEVICE)
@@ -173,7 +177,6 @@ def train_epoch(model, optim, train_dl, special_symbols,vocab_charges, vocab_pdg
                         + (tgt_out_charges == vocab_charges.get_index(special_symbols["bos"]["CEL"]))) 
         spe_tokens_mask = eos_bos_mask + tgt_out_padding_mask
         #Computing the losses
-        logging.info("Computing the losses, training")
         loss_charges = loss_fn_charges(logits_charges.transpose(dim0 = -2, dim1 = -1), tgt_out_charges)
         loss_pdg = loss_fn_pdg(logits_pdg.transpose(dim0 = -2, dim1 = -1), tgt_out_pdg)
         loss_cont_vec = loss_fn_cont(logits_cont, tgt_out_cont)
@@ -182,67 +185,79 @@ def train_epoch(model, optim, train_dl, special_symbols,vocab_charges, vocab_pdg
         loss_cont = torch.mean(loss_cont_vec[~spe_tokens_mask])
         
         loss = loss_charges * hyperweights_lossfn[0] + loss_pdg * hyperweights_lossfn[1] + loss_cont*hyperweights_lossfn[2]
-        logging.info("Backward propagation...")
         loss.backward()
         optim.step()
-        
-        loss_epoch += loss.item()
 
-    return loss_epoch / len(list(train_dl))
+        logging.info(f"training: batch done")
+        loss_epoch += loss.item()
+        loss_epoch_charges += loss_charges.item()
+        loss_epoch_pdgs += loss_pdg.item()
+        loss_epoch_cont += loss_cont.item()
+        size_batch = len(list(train_dl))
+    return (loss_epoch / size_batch, loss_epoch_charges / size_batch, loss_epoch_pdgs / size_batch, loss_epoch_cont / size_batch)
 
 def validate_epoch(model, val_dl, special_symbols,vocab_charges, vocab_pdgs, 
                    hyperweights_lossfn, loss_fn_charges, loss_fn_pdg,loss_fn_cont):  
     model.eval() #setting model into train mode
     loss_epoch = 0.0
+    loss_epoch_charges = 0.0
+    loss_epoch_pdgs = 0.0
+    loss_epoch_cont = 0.0
     for src,tgt in val_dl:
-                src = src.to(DEVICE)
+        src = src.to(DEVICE)
         tgt = tgt.to(DEVICE)
-        print(f"allocated memory on GPU after moving: {torch.cuda.memory_allocated(device = DEVICE)}")
-        src_padding_mask, tgt_padding_mask = create_mask(src,tgt,special_symbols["pad"]["cont"], DEVICE)
-        tgt_in_padding_mask = tgt_padding_mask[:,:-1]
-        tgt_out_padding_mask = tgt_padding_mask[:,1:]
-        tgt_in = tgt[:,:-1] #sets the dimensions of transformer output -> must have the same as tgt_out
-        logits_charges, logits_pdg, logits_cont = model(src,tgt_in, 
+        with torch.no_grad():
+            print(f"allocated memory on GPU after moving: {torch.cuda.memory_allocated(device = DEVICE)}")
+            src_padding_mask, tgt_padding_mask = create_mask(src,tgt,special_symbols["pad"]["cont"], DEVICE)
+            tgt_in_padding_mask = tgt_padding_mask[:,:-1]
+            tgt_out_padding_mask = tgt_padding_mask[:,1:]
+            tgt_in = tgt[:,:-1] #sets the dimensions of transformer output -> must have the same as tgt_out
+            logits_charges, logits_pdg, logits_cont = model(src,tgt_in, 
                                                                 src_padding_mask,
                                                                 tgt_in_padding_mask,
                                                                 src_padding_mask)
-        optim.zero_grad()
-        tgt_out = tgt[:,1:,:] #logits are compared with tokens shifted
-        tgt_out_charges = tgt_out[...,0].to(torch.long)
-        tgt_out_pdg = tgt_out[...,1].to(torch.long)
-        tgt_out_cont = tgt_out[...,2:-2] #only (E, n_x,n_y,n_z)
-        #Using spherical coordinates to get 3D direction vectors
-        logits_cont_sin_theta = torch.sin(logits_cont[...,-2]) #logits: (E, theta, phi)
-        logits_cont_nx = torch.cos(logits_cont[...,-1]) * logits_cont_sin_theta
-        logits_cont_ny = torch.sin(logits_cont[...,2]) * logits_cont_sin_theta
-        logits_cont = torch.concat([logits_cont[...,0].unsqueeze(-1),
-                                    logits_cont_nx.unsqueeze(-1),
-                                    logits_cont_ny.unsqueeze(-1),  
-                                    torch.cos(logits_cont[...,1]).unsqueeze(-1)], 
-                                    dim = -1)
-        #special_tokens are not taken into account in the continuous loss
-        eos_bos_mask = ((tgt_out_charges == vocab_charges.get_index(special_symbols["eos"]["CEL"]))
-                        + (tgt_out_charges == vocab_charges.get_index(special_symbols["bos"]["CEL"]))) 
-        spe_tokens_mask = eos_bos_mask + tgt_out_padding_mask
-        #Computing the losses
-        logging.info("Computing the losses, training")
-        loss_charges = loss_fn_charges(logits_charges.transpose(dim0 = -2, dim1 = -1), tgt_out_charges)
-        loss_pdg = loss_fn_pdg(logits_pdg.transpose(dim0 = -2, dim1 = -1), tgt_out_pdg)
-        loss_cont_vec = loss_fn_cont(logits_cont, tgt_out_cont)
-        #nspe_tokens = torch.count_nonzero(spe_tokens_mask, dim = -1)
-        #n_nospe = spe_tokens_mask.shape[-1] - nspe_tokens
-        loss_cont = torch.mean(loss_cont_vec[~spe_tokens_mask])
         
-        loss = loss_charges * hyperweights_lossfn[0] + loss_pdg * hyperweights_lossfn[1] + loss_cont*hyperweights_lossfn[2]
-        loss_epoch += loss.item()
-
-    return loss_epoch / len(list(val_dl))
+            tgt_out = tgt[:,1:,:] #logits are compared with tokens shifted
+            tgt_out_charges = tgt_out[...,0].to(torch.long)
+            tgt_out_pdg = tgt_out[...,1].to(torch.long)
+            tgt_out_cont = tgt_out[...,2:-2] #only (E, n_x,n_y,n_z)
+            #Using spherical coordinates to get 3D direction vectors
+            logits_cont_sin_theta = torch.sin(logits_cont[...,-2]) #logits: (E, theta, phi)
+            logits_cont_nx = torch.cos(logits_cont[...,-1]) * logits_cont_sin_theta
+            logits_cont_ny = torch.sin(logits_cont[...,2]) * logits_cont_sin_theta
+            logits_cont = torch.concat([logits_cont[...,0].unsqueeze(-1),
+                                        logits_cont_nx.unsqueeze(-1),
+                                        logits_cont_ny.unsqueeze(-1),  
+                                        torch.cos(logits_cont[...,1]).unsqueeze(-1)], 
+                                       dim = -1)
+            #special_tokens are not taken into account in the continuous loss
+            eos_bos_mask = ((tgt_out_charges == vocab_charges.get_index(special_symbols["eos"]["CEL"]))
+                            + (tgt_out_charges == vocab_charges.get_index(special_symbols["bos"]["CEL"]))) 
+            spe_tokens_mask = eos_bos_mask + tgt_out_padding_mask
+            #Computing the losses
+            loss_charges = loss_fn_charges(logits_charges.transpose(dim0 = -2, dim1 = -1), tgt_out_charges)
+            loss_pdg = loss_fn_pdg(logits_pdg.transpose(dim0 = -2, dim1 = -1), tgt_out_pdg)
+            loss_cont_vec = loss_fn_cont(logits_cont, tgt_out_cont)
+            #nspe_tokens = torch.count_nonzero(spe_tokens_mask, dim = -1)
+            #n_nospe = spe_tokens_mask.shape[-1] - nspe_tokens
+            loss_cont = torch.mean(loss_cont_vec[~spe_tokens_mask])
+        
+            loss = loss_charges * hyperweights_lossfn[0] + loss_pdg * hyperweights_lossfn[1] + loss_cont*hyperweights_lossfn[2]
+            loss_epoch += loss.item()
+            logging.info("validation: batch done")
+            loss_epoch_charges += loss_charges.item()
+            loss_epoch_pdgs += loss_pdg.item()
+            loss_epoch_cont += loss_cont.item()
+            size_batch = len(list(val_dl))
+    return (loss_epoch / size_batch, loss_epoch_charges / size_batch, loss_epoch_pdgs / size_batch, loss_epoch_cont / size_batch)
 
 def train_and_validate(config):
 
     logger = logging.getLogger(__name__)
     logging.basicConfig(filename= config["dir_results"] + "log.txt", level= logging.INFO)
-
+    file_handler = logging.FileHandler(logger.name, mode = 'w')
+    logger.addHandler(file_handler)
+    
     console = logging.StreamHandler()
     console.setLevel(logging.INFO)
     logging.getLogger().addHandler(console)
@@ -275,10 +290,6 @@ def train_and_validate(config):
     ).to(DEVICE)
 
     print(f"memory on CUDA, model created: {torch.cuda.memory_allocated(DEVICE)}")
-
-
-
-    
     
     logging.info("Created model, now training")
     print(f"DEVICE: {DEVICE}") 
@@ -289,12 +300,19 @@ def train_and_validate(config):
 
     val_loss_min = 1e9
     nepoch = config["epochs"]
-    losses_evolution = {"train": torch.zeros(nepoch),
-                        "val": torch.zeros(nepoch),
-                        "time":  torch.zeros(nepoch)}
+    losses_evolution = {"train": np.zeros(nepoch),
+                        "val": np.zeros(nepoch),
+                        "time":  np.zeros(nepoch),
+                        "charges_train": np.zeros(nepoch),
+                        "pdgs_train": np.zeros(nepoch),
+                        "cont_train": np.zeros(nepoch),
+                        "charges_val": np.zeros(nepoch),
+                        "pdgs_val": np.zeros(nepoch),
+                        "cont_val": np.zeros(nepoch)}
+    
     for i in range(nepoch):
         start_time = time()
-        train_loss_epoch = train_epoch(model,
+        train_loss_epoch, charges_train, pdgs_train, cont_train = train_epoch(model,
                                        optim = optim,
                                        train_dl=train_dl,
                                        hyperweights_lossfn= config["hyper_loss"],
@@ -304,9 +322,9 @@ def train_and_validate(config):
                                        loss_fn_charges = loss_fn_charges,
                                        loss_fn_pdg= loss_fn_pdgs,
                                        loss_fn_cont= loss_fn_cont)
-        time_epoch = start_time - time() 
+        time_epoch = time() - start_time 
         logging.info("Finished training for one epoch, going to valiation")
-        val_loss_epoch = validate_epoch(model,
+        val_loss_epoch, charges_val, pdgs_val,cont_val = validate_epoch(model,
                                        val_dl=val_dl,
                                        hyperweights_lossfn= config["hyper_loss"],
                                        special_symbols = special_symbols,
@@ -319,6 +337,12 @@ def train_and_validate(config):
         losses_evolution["train"][i] = train_loss_epoch
         losses_evolution["val"][i] = val_loss_epoch
         losses_evolution["time"][i] = time_epoch
+        losses_evolution["charges_train"][i] = charges_train
+        losses_evolution["pdgs_train"][i] = pdgs_train
+        losses_evolution["cont_train"][i] = cont_train
+        losses_evolution["charges_val"][i] = charges_val
+        losses_evolution["pdgs_val"][i] = pdgs_val
+        losses_evolution["cont_val"][i] = cont_val
 
         if val_loss_epoch < val_loss_min:
             logging.info("New best Model, saving...")
@@ -327,7 +351,8 @@ def train_and_validate(config):
 
         logging.info(f"{i + 1} epoch done, time: {time_epoch}, val_loss: {val_loss_epoch}, train_loss: {train_loss_epoch}")
     
-    torch.save(losses_evolution, "losses.pt")
+    torch.save(losses_evolution, config["dir_results"] + "losses.pt")
+    logging.info("Finished all epochs and saved the losses")
 
 if __name__ == "__main__":
 
