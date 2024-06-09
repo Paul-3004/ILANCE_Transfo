@@ -1,0 +1,45 @@
+INFO:root:Getting the training data from/data/suehara/mldata/pfa/ntau_10to100GeV_10/train
+INFO:root:Getting the training data from/data/suehara/mldata/pfa/ntau_10to100GeV_10/train
+INFO:root:Getting the training data from/data/suehara/mldata/pfa/ntau_10to100GeV_10/train
+INFO:root:Getting the training data from/data/suehara/mldata/pfa/ntau_10to100GeV_10/train
+INFO:root:Loaded the data and saved vocabularies
+INFO:root:Created model, now training
+INFO:root:Getting the training data from/data/suehara/mldata/pfa/ntau_10to100GeV_10/train
+INFO:root:Loaded the data and saved vocabularies
+INFO:root:Getting the training data from/data/suehara/mldata/pfa/ntau_10to100GeV_10/train
+INFO:root:Loaded the data and saved vocabularies
+INFO:root:Created model, now training
+INFO:root:Getting the training data from/data/suehara/mldata/pfa/ntau_10to100GeV_10/train
+INFO:root:Loaded the data and saved vocabularies
+INFO:root:Created model, now training
+INFO:root:Getting the training data from/data/suehara/mldata/pfa/ntau_10to100GeV_10/train
+INFO:root:Loaded the data and saved vocabularies
+INFO:root:Created model, now training
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:New best Model, saving...
+INFO:root:1 epoch done, time: 10.571821928024292, val_loss: 0.9171817803382873, train_loss: 0.9987338590621948
+INFO:root:Getting the training data from/data/suehara/mldata/pfa/ntau_10to100GeV_10/train
+INFO:root:Loaded the data and saved vocabularies
+INFO:root:Created model, now training
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:New best Model, saving...
+INFO:root:1 epoch done, time: 8.288389444351196, val_loss: 0.9170934772491455, train_loss: 1.0023966002464295
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:New best Model, saving...
+INFO:root:2 epoch done, time: 7.908471345901489, val_loss: 0.9017972707748413, train_loss: 0.9172735524177551
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:New best Model, saving...
+INFO:root:3 epoch done, time: 7.884868860244751, val_loss: 0.8806173157691956, train_loss: 0.9007662987709045
+INFO:root:Finished all epochs and saved the losses
+INFO:root:Getting the training data from/data/suehara/mldata/pfa/ntau_10to100GeV_10/train
+INFO:root:Loaded the data and saved vocabularies
+INFO:root:Created model, now training
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:New best Model, saving...
+INFO:root:1 epoch done, time: 7.979728937149048, val_loss: 0.9574434340000153, train_loss: 1.181616073846817
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:New best Model, saving...
+INFO:root:2 epoch done, time: 7.4456963539123535, val_loss: 0.9227510273456574, train_loss: 0.9518371999263764
+INFO:root:Finished all epochs and saved the losses
+INFO:root:Getting the training data from/data/suehara/mldata/pfa/ntau_10to100GeV_10/train
+INFO:root:Getting the training data from/data/suehara/mldata/pfa/ntau_10to100GeV_10/train
