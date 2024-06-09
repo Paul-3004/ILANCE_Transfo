@@ -153,7 +153,7 @@ def train_epoch(model, optim, train_dl, special_symbols,vocab_charges, vocab_pdg
     for src,tgt in train_dl:
         src = src.to(DEVICE)
         tgt = tgt.to(DEVICE)
-        print(f"allocated memory on GPU after moving: {torch.cuda.memory_allocated(device = DEVICE)}")
+        #print(f"allocated memory on GPU after moving: {torch.cuda.memory_allocated(device = DEVICE)}")
         src_padding_mask, tgt_padding_mask = create_mask(src,tgt,special_symbols["pad"]["cont"], DEVICE)
         tgt_in_padding_mask = tgt_padding_mask[:,:-1]
         tgt_out_padding_mask = tgt_padding_mask[:,1:]
@@ -188,12 +188,34 @@ def train_epoch(model, optim, train_dl, special_symbols,vocab_charges, vocab_pdg
         loss.backward()
         optim.step()
 
-        logging.info(f"training: batch done")
+        #logging.info(f"training: batch done")
         loss_epoch += loss.item()
         loss_epoch_charges += loss_charges.item()
         loss_epoch_pdgs += loss_pdg.item()
         loss_epoch_cont += loss_cont.item()
         size_batch = len(list(train_dl))
+
+        #print(f"src device: {src.device}")
+        #print(f"tgt device: {tgt.device}")
+        #print(f"src_padding_mask device: {src_padding_mask.device}")
+        #print(f"tgt_padding_mask device: {tgt_padding_mask.device}")
+        #print(f"tgt_in_padding_mask device: {tgt_in_padding_mask.device}")
+        #print(f"tgt_out_padding_mask device: {tgt_out_padding_mask.device}")
+        #print(f"tgt_out device: {tgt_out.device}")
+        #print(f"tgt_out_charges device: {tgt_out_charges.device}")
+        #print(f"tgt_out_pdg device: {tgt_out_pdg.device}")
+        #print(f"tgt_out_cont device: {tgt_out_cont.device}")
+        #print(f"logits_charges device: {logits_charges.device}")
+        #print(f"logits_pdg device: {logits_pdg.device}")
+        #print(f"logits_cont device: {logits_cont.device}")
+        #print(f"logits_cont_sin_theta device: {logits_cont_sin_theta.device}")
+        #print(f"logits_cont_nx device: {logits_cont_nx.device}")
+        #print(f"logits_cont_ny device: {logits_cont_ny.device}")
+        #print(f"logits_cont device: {logits_cont.device}")
+        #print(f"eos_bos_mask device: {eos_bos_mask.device}")
+        #print(f"spe_tokens_mask device: {spe_tokens_mask.device}")
+        
+        
     return (loss_epoch / size_batch, loss_epoch_charges / size_batch, loss_epoch_pdgs / size_batch, loss_epoch_cont / size_batch)
 
 def validate_epoch(model, val_dl, special_symbols,vocab_charges, vocab_pdgs, 
@@ -207,7 +229,7 @@ def validate_epoch(model, val_dl, special_symbols,vocab_charges, vocab_pdgs,
         src = src.to(DEVICE)
         tgt = tgt.to(DEVICE)
         with torch.no_grad():
-            print(f"allocated memory on GPU after moving: {torch.cuda.memory_allocated(device = DEVICE)}")
+            #print(f"allocated memory on GPU after moving: {torch.cuda.memory_allocated(device = DEVICE)}")
             src_padding_mask, tgt_padding_mask = create_mask(src,tgt,special_symbols["pad"]["cont"], DEVICE)
             tgt_in_padding_mask = tgt_padding_mask[:,:-1]
             tgt_out_padding_mask = tgt_padding_mask[:,1:]
@@ -244,7 +266,7 @@ def validate_epoch(model, val_dl, special_symbols,vocab_charges, vocab_pdgs,
         
             loss = loss_charges * hyperweights_lossfn[0] + loss_pdg * hyperweights_lossfn[1] + loss_cont*hyperweights_lossfn[2]
             loss_epoch += loss.item()
-            logging.info("validation: batch done")
+            #logging.info("validation: batch done")
             loss_epoch_charges += loss_charges.item()
             loss_epoch_pdgs += loss_pdg.item()
             loss_epoch_cont += loss_cont.item()
@@ -263,7 +285,7 @@ def train_and_validate(config):
     logging.getLogger().addHandler(console)
 
     logging.info("Getting the training data from" +config["dir_path_train"])
-    vocab_charges, vocab_pdgs, special_symbols, _, train_dl, val_dl = get_data(config["dir_path_train"], config["dir_path_val"], config["batch_size"], "training")
+    vocab_charges, vocab_pdgs, special_symbols, _, train_dl, val_dl = get_data(config["dir_path_train"], config["dir_path_val"], config["batch_size"], config["frac_files"], "training")
     torch.save(vocab_charges.vocab, config["dir_results"] + "vocab_charges.pt")
     torch.save(vocab_pdgs.vocab, config["dir_results"] + "vocab_PDGs.pt")
     
@@ -290,7 +312,10 @@ def train_and_validate(config):
     ).to(DEVICE)
 
     print(f"memory on CUDA, model created: {torch.cuda.memory_allocated(DEVICE)}")
-    
+    nparams = sum(param.numel() for param in model.parameters())
+    nparams_trainable = sum(param.numel() for param in model.parameters() if param.requires_grad)
+    print(f"number of parameters: {nparams}")
+    print(f"number of parameters: {nparams_trainable}")
     logging.info("Created model, now training")
     print(f"DEVICE: {DEVICE}") 
     optim = torch.optim.Adam(model.parameters(), lr = config["lr"])
@@ -300,15 +325,24 @@ def train_and_validate(config):
 
     val_loss_min = 1e9
     nepoch = config["epochs"]
-    losses_evolution = {"train": np.zeros(nepoch),
-                        "val": np.zeros(nepoch),
-                        "time":  np.zeros(nepoch),
-                        "charges_train": np.zeros(nepoch),
-                        "pdgs_train": np.zeros(nepoch),
-                        "cont_train": np.zeros(nepoch),
-                        "charges_val": np.zeros(nepoch),
-                        "pdgs_val": np.zeros(nepoch),
-                        "cont_val": np.zeros(nepoch)}
+    n_loss = config["n_loss"]
+    nevents_per_file = config["events_per_file"]
+    nfiles = config["nfiles"]
+    batch_size = config["batch_size"]
+    log_freq = (nfiles * nevents_per_file*nepoch) / (n_loss * config["batch_size"])
+    if log_freq > 1:
+        logging.info("Initial loss function logging frequency higher than 1. Setting to 1")
+        log_freq = 1
+        n_loss = ceil(nfiles * nevents_per_file * nepoch) / batch_size
+    losses_evolution = {"train": np.zeros(n_loss),
+                        "val": np.zeros(n_loss),
+                        "time":  np.zeros(n_loss),
+                        "charges_train": np.zeros(n_loss),
+                        "pdgs_train": np.zeros(n_loss),
+                        "cont_train": np.zeros(n_loss),
+                        "charges_val": np.zeros(n_loss),
+                        "pdgs_val": np.zeros(n_loss),
+                        "cont_val": np.zeros(n_loss)}
     
     for i in range(nepoch):
         start_time = time()
@@ -363,7 +397,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    with open(args.config_path + "ConfigFile_remote.json") as f:
+    with open(args.config_path + "ConfigFile.json") as f:
         config = json.load(f)
 
     if args.inference:
