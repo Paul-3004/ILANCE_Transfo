@@ -42,7 +42,7 @@ def load_awkward2(filename):
     return ak_feat, ak_label
 
 def load_awkwards(filenames):
-    print(f"{filenames=}")
+    #print(f"{filenames=}")
     assert(len(filenames)>0)
     for i, file in enumerate(filenames):
         print(f"Reading file: {file=}")

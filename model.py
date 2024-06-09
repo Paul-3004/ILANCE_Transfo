@@ -70,8 +70,8 @@ class ClustersFinder(nn.Module):
         Note:
             1. if tgt_is_causal is True, tgt_mask is generated automatically as a causal mask'''
     def forward(self, src, tgt, src_padding_mask, tgt_padding_mask, memory_padding_mask):
-        print("src device =========")
-        print(src.device)
+        #print("src device =========")
+        #print(src.device)
         src = self.input_embedder(src)
         tgt = self.tgt_embedder(tgt)
         output = self.transformer(src = src,tgt = tgt, 

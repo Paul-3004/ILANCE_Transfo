@@ -519,3 +519,4 @@ INFO:root:validation: batch done
 INFO:root:New best Model, saving...
 INFO:root:20 epoch done, time: 57.652257442474365, val_loss: 3.084436225891113, train_loss: 3.075206089019775
 INFO:root:Finished all epochs and saved the losses
+INFO:root:Getting the training data from/data/suehara/mldata/pfa/ntau_10to100GeV_10/train

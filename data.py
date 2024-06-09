@@ -139,9 +139,9 @@ class CollectionHitsTraining(Dataset):
             do_time: bool, if True, time of hits is kept'''
     def __init__(self, dir_path: str, special_symbols: dict,do_tracks: bool = False, do_time: bool = False):
         super(CollectionHitsTraining,self).__init__()
-        filenames = list(sorted(glob.iglob(dir_path + '/*.h5')))[0:1]
+        filenames = list(sorted(glob.iglob(dir_path + '/*.h5')))
         if len(filenames) == 1:
-            feats, labels = la.load_awkward2(filenames[0]) #get the events from the only file
+            feats, labels = la.load_awkward2(filenames) #get the events from the only file
         elif len(filenames) > 1:
             feats, labels = la.load_awkwards(filenames) #get the events from each file
         else:
