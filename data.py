@@ -4,6 +4,7 @@ import load_awkward as la
 import awkward as ak
 import numpy as np
 import glob
+from math import ceil
 
 '''creates masks to avoid padding tokens influencing the attention.
     Position with True will be ignored.
@@ -137,13 +138,19 @@ class CollectionHitsTraining(Dataset):
                                     "sample": sample_cont}
             do_tracks: bool. If true, tracks are stored in the Dataset
             do_time: bool, if True, time of hits is kept'''
-    def __init__(self, dir_path: str, special_symbols: dict,do_tracks: bool = False, do_time: bool = False):
+    def __init__(self, dir_path: str, special_symbols: dict,frac_files: float,do_tracks: bool = False, do_time: bool = False):
+        if frac_files < 0 or frac_files > 1:
+            raise ValueError("The fraction of files must lie inbetween 0 and 1")
+
         super(CollectionHitsTraining,self).__init__()
         filenames = list(sorted(glob.iglob(dir_path + '/*.h5')))
-        if len(filenames) == 1:
-            feats, labels = la.load_awkward2(filenames) #get the events from the only file
-        elif len(filenames) > 1:
-            feats, labels = la.load_awkwards(filenames) #get the events from each file
+        print(filenames)
+        nfiles = ceil(frac_files * len(filenames))
+        print(nfiles)
+        if nfiles == 1:
+            feats, labels = la.load_awkward2(filenames[0]) #get the events from the only file
+        elif nfiles > 1:
+            feats, labels = la.load_awkwards(filenames[:nfiles]) #get the events from each file
         else:
             raise ValueError(f"There is no h5py file in the directory {dir_path}")
         
@@ -336,7 +343,7 @@ class CollectionHitsInference(Dataset):
 #         return DataLoader(data_set, batch_size = batch_size)
 #     else:
 #         raise ValueError(model_mode + " is an invalid entry. Must be either training or inference")    
-def get_data(dir_path_train, dir_path_val, batch_size, model_mode:str):
+def get_data(dir_path_train, dir_path_val, batch_size, frac_files,model_mode:str):
     special_symbols = {
             "pad": {"cont": [0.,1.],"CEL":-150},
             "bos": {"cont": [1.,1.], "CEL":-100},
@@ -344,8 +351,8 @@ def get_data(dir_path_train, dir_path_val, batch_size, model_mode:str):
             "sample": [0.,0.]
     }
     if model_mode == "training":
-        data_set_train = CollectionHitsTraining(dir_path_train,special_symbols)
-        data_set_val = CollectionHitsTraining(dir_path_val, special_symbols)
+        data_set_train = CollectionHitsTraining(dir_path_train,special_symbols, frac_files)
+        data_set_val = CollectionHitsTraining(dir_path_val, special_symbols, frac_files)
         vocab_charges, vocab_pdgs = data_set_train.vocab_charges, data_set_train.vocab_pdgs
         vocab_charges_val, vocab_pdgs_val = data_set_val.vocab_charges, data_set_val.vocab_pdgs
 
@@ -377,7 +384,7 @@ special_symbols = {
 testing = False
 if testing:
     dir_path = "/Users/paulwahlen/Desktop/Internship/ML/Code/TransfoV1/data"
-    vocab_charges, vocab_pgs, special_symbols,E_label_RMSNormalizer, data_ld = get_data(dir_path,25,special_symbols, "training")
+    vocab_charges, vocab_pgs, special_symbols,E_label_RMSNormalizer, data_ld, val_dl = get_data(dir_path,dir_path,25,0.1, "training")
     feat0,label0 = next(iter(data_ld))
     print(feat0[0,0:30])
     print(torch.max(feat0[0]))
@@ -386,7 +393,7 @@ if testing:
     #print(feats0[0])
     #print(torch.square(label0[0][...,3]) + torch.square(label0[0][...,4]) + torch.square(label0[0][...,5]))
     mean_E =0.
-    for batch_feat, batch_label in data_ld:
+    for i, (batch_feat, batch_label) in enumerate(data_ld):
         print(batch_feat.size())
         mean_E += torch.mean(batch_feat[...,0])     #mean energy
     
