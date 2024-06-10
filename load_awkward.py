@@ -2,12 +2,7 @@ import json
 import h5py
 import awkward as ak
 import numpy as np
-<<<<<<< HEAD
-import time
-
-=======
 from time import time
->>>>>>> d71f3dd2578d215fa8f0ec20ca675c99f375226f
 def load_awkward2(filename):
     file = h5py.File(filename) #Create File object                                                                                                                                   
     feat = file["feature"] #access the feature group, File contains two subgroups, feature and label                                                                                 
@@ -52,18 +47,14 @@ def load_awkwards(filenames):
     feats_list, labels_list = [], []
     for i, file in enumerate(filenames):
         print(f"Reading file: {file=}")
-        start = time()
         feat, label = load_awkward2(file)
-<<<<<<< HEAD
-        print(time()- start)
-        if i==0:
-            ak_feats = feat
-            ak_labels = label
-        else:
-            ak_feats = ak.concatenate((ak_feats, feat), axis=0)
-            ak_labels = ak.concatenate((ak_labels, label), axis=0)
+        #if i==0:
+        #    ak_feats = feat
+        #    ak_labels = label
+        #else:
+        #    ak_feats = ak.concatenate((ak_feats, feat), axis=0)
+        #    ak_labels = ak.concatenate((ak_labels, label), axis=0)
 
-=======
         feats_list.append(feat)
         labels_list.append(label)
     #print(len(feats_list))
@@ -82,7 +73,6 @@ def load_awkwards(filenames):
     ak_feats = ak.concatenate(feats_list, axis=0)
     ak_labels = ak.concatenate(labels_list, axis=0)
     print(time()-start)
->>>>>>> d71f3dd2578d215fa8f0ec20ca675c99f375226f
         #print (ak.num(ak_feats,axis=0), ak.num(ak_labels,axis=0))                                                                                                                   
 
     return ak_feats, ak_labels
