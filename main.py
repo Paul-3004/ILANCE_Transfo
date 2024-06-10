@@ -12,7 +12,7 @@ from model import ClustersFinder
 from argparse import ArgumentParser
 import json
 import logging
-DEVICE = torch.device('cuda:5' if torch.cuda.is_available() else 'cpu')
+DEVICE = torch.device('cuda:6' if torch.cuda.is_available() else 'cpu')
 
 
 def get_loss_log_freq(nlog_per_epoch,nbatches):
@@ -20,8 +20,8 @@ def get_loss_log_freq(nlog_per_epoch,nbatches):
     if period == 0:
         period = 1
 
-    nlog_update = nbatches / period
-    return period, nlog_update
+    nlog_update = nbatches // period
+    return {"period": period, "nlog": nlog_update}
 
 '''
 Feeds the input to the model and outputs the translated version by a greedy algorithm. 
@@ -154,14 +154,18 @@ def inference(opts):
 #train the model for one epoch
 #src: input hits from simulation, tgt: MC truth clusters 
 def train_epoch(model, optim, train_dl, special_symbols,vocab_charges, vocab_pdgs, 
-          hyperweights_lossfn, loss_fn_charges, loss_fn_pdg,loss_fn_cont,nlog_epoch, loss_evo):
+                hyperweights_lossfn, loss_fn_charges, loss_fn_pdg,loss_fn_cont,nlog_period_epoch, loss_evo, epoch):
     model.train() #setting model into train mode
+
+    period = nlog_period_epoch["period"]
+    nlog_epoch = nlog_period_epoch["nlog"]
     loss_epoch_tot = 0.
     loss_epoch = 0.0
     loss_epoch_charges = 0.0
     loss_epoch_pdgs = 0.0
     loss_epoch_cont = 0.0
-    for i,(src,tgt) in train_dl:
+    count_log = 0
+    for i,(src,tgt) in enumerate(train_dl):
         src = src.to(DEVICE)
         tgt = tgt.to(DEVICE)
         #print(f"allocated memory on GPU after moving: {torch.cuda.memory_allocated(device = DEVICE)}")
@@ -201,6 +205,7 @@ def train_epoch(model, optim, train_dl, special_symbols,vocab_charges, vocab_pdg
 
         #logging.info(f"training: batch done")
         loss_epoch += loss.item()
+        loss_epoch_tot += loss.item()
         loss_epoch_charges += loss_charges.item()
         loss_epoch_pdgs += loss_pdg.item()
         loss_epoch_cont += loss_cont.item()
@@ -225,27 +230,34 @@ def train_epoch(model, optim, train_dl, special_symbols,vocab_charges, vocab_pdg
         #print(f"logits_cont device: {logits_cont.device}")
         #print(f"eos_bos_mask device: {eos_bos_mask.device}")
         #print(f"spe_tokens_mask device: {spe_tokens_mask.device}")
-        if (i + 1) % nlog_epoch == 0:
-            loss_evo["train"] = loss_epoch / nlog_epoch
-            loss_evo["charges_train"] = loss_epoch_charges / nlog_epoch
-            loss_evo["pdgs_train"] = loss_epoch_pdgs / nlog_epoch
-            loss_evo["cont_train"] = loss_epoch_cont / nlog_epoch
+        if (i + 1) % period == 0:
+            #logging.info(f"recording the losses, training, minibatch = {i + 1}")
+            #print(nlog_epoch)
+            loss_evo["train"][nlog_epoch *epoch + count_log] = loss_epoch / nlog_epoch
+            loss_evo["charges_train"][nlog_epoch *epoch + count_log] = loss_epoch_charges / nlog_epoch
+            loss_evo["pdgs_train"][nlog_epoch *epoch + count_log] = loss_epoch_pdgs / nlog_epoch
+            loss_evo["cont_train"][nlog_epoch *epoch + count_log] = loss_epoch_cont / nlog_epoch
             loss_epoch = 0.
             loss_epoch_charges = 0.
             loss_epoch_pdgs = 0.
             loss_epoch_cont = 0.
-
+            count_log += 1
         #return (loss_epoch / size_batch, loss_epoch_charges / size_batch, loss_epoch_pdgs / size_batch, loss_epoch_cont / size_batch)
-        return loss_epoch_tot / size_batch
+    return loss_epoch_tot / size_batch
 
 def validate_epoch(model, val_dl, special_symbols,vocab_charges, vocab_pdgs, 
-                   hyperweights_lossfn, loss_fn_charges, loss_fn_pdg,loss_fn_cont, nlog_epoch, loss_evo):  
+                   hyperweights_lossfn, loss_fn_charges, loss_fn_pdg,loss_fn_cont, nlog_period_epoch, loss_evo,epoch):  
     model.eval() #setting model into train mode
+
+    log_period = nlog_period_epoch["period"]
+    nlog_epoch = nlog_period_epoch["nlog"]
+    
     loss_epoch_tot = 0.0
     loss_epoch = 0.0
     loss_epoch_charges = 0.0
     loss_epoch_pdgs = 0.0
     loss_epoch_cont = 0.0
+    count_log = 0
     for i, (src,tgt) in enumerate(val_dl):
         src = src.to(DEVICE)
         tgt = tgt.to(DEVICE)
@@ -294,15 +306,17 @@ def validate_epoch(model, val_dl, special_symbols,vocab_charges, vocab_pdgs,
             loss_epoch_cont += loss_cont.item()
             size_batch = len(val_dl)
 
-            if (i + 1) % nlog_epoch == 0:
-                loss_evo["val"] = loss_epoch / nlog_epoch
-                loss_evo["charges_val"] = loss_epoch_charges / nlog_epoch
-                loss_evo["pdgs_val"] = loss_epoch_pdgs / nlog_epoch
-                loss_evo["cont_val"] = loss_epoch_cont / nlog_epoch
+            if (i + 1) % log_period == 0:
+                #logging.info(f"saving losses validation, minibatch = {i}")
+                loss_evo["val"][nlog_epoch *epoch + count_log] = loss_epoch / nlog_epoch
+                loss_evo["charges_val"][nlog_epoch *epoch + count_log] = loss_epoch_charges / nlog_epoch
+                loss_evo["pdgs_val"][nlog_epoch *epoch + count_log] = loss_epoch_pdgs / nlog_epoch
+                loss_evo["cont_val"][nlog_epoch *epoch + count_log] = loss_epoch_cont / nlog_epoch
                 loss_epoch = 0.
                 loss_epoch_charges = 0.
                 loss_epoch_pdgs = 0.
                 loss_epoch_cont = 0.
+                count_log += 1
     #return (loss_epoch / size_batch, loss_epoch_charges / size_batch, loss_epoch_pdgs / size_batch, loss_epoch_cont / size_batch)
     return loss_epoch_tot / size_batch
 
@@ -318,7 +332,7 @@ def train_and_validate(config):
     logging.getLogger().addHandler(console)
 
     logging.info("Getting the training data from" +config["dir_path_train"])
-    vocab_charges, vocab_pdgs, special_symbols, _, train_dl, val_dl = get_data(config["dir_path_train"], config["dir_path_val"], config["batch_size"], config["nfiles"], "training")
+    vocab_charges, vocab_pdgs, special_symbols, _, train_dl, val_dl = get_data(config["dir_path_train"], config["dir_path_val"], config["batch_size"], config["frac_files"], "training")
     torch.save(vocab_charges.vocab, config["dir_results"] + "vocab_charges.pt")
     torch.save(vocab_pdgs.vocab, config["dir_results"] + "vocab_PDGs.pt")
     
@@ -349,7 +363,7 @@ def train_and_validate(config):
     nparams_trainable = sum(param.numel() for param in model.parameters() if param.requires_grad)
     print(f"number of parameters: {nparams}")
     print(f"number of parameters: {nparams_trainable}")
-    logging.info("Created model, now training")
+    logging.info("Created model, computing logging frequencies...")
     print(f"DEVICE: {DEVICE}") 
     optim = torch.optim.Adam(model.parameters(), lr = config["lr"])
     loss_fn_charges = nn.CrossEntropyLoss(ignore_index=vocab_charges.get_index(special_symbols["pad"]["CEL"]), reduction ='mean')
@@ -363,10 +377,10 @@ def train_and_validate(config):
     nbatches_train = len(train_dl)
     nbatches_val = len(val_dl)
 
-    period_train, nlog_epoch_train = get_loss_log_freq(nlog_epoch,nbatches_train)
-    period_val, nlog_epoch_val = get_loss_log_freq(nlog_epoch,nbatches_val)
-    nloss_train = nepoch * nlog_epoch_train
-    nloss_val = nepoch * nlog_epoch_val
+    nlog_period_train = get_loss_log_freq(nlog_epoch,nbatches_train)
+    nlog_period_val = get_loss_log_freq(nlog_epoch,nbatches_val)
+    nloss_train = int(nepoch * nlog_period_train["nlog"])
+    nloss_val = int(nepoch * nlog_period_val["nlog"])
     losses_evolution = {"train": np.zeros(nloss_train),
                         "val": np.zeros(nloss_val),
                         "charges_train": np.zeros(nloss_train),
@@ -375,6 +389,7 @@ def train_and_validate(config):
                         "charges_val": np.zeros(nloss_val),
                         "pdgs_val": np.zeros(nloss_val),
                         "cont_val": np.zeros(nloss_val)}
+    logging.info(f"Logging frequencies computed, nlog_epoch modified as: {nlog_epoch} to {nlog_period_train['nlog']}. Number of losses that will be recorded is thus: {nloss_train} for the training set and {nloss_val}")
     
     for i in range(nepoch):
         start_time = time()
@@ -399,8 +414,9 @@ def train_and_validate(config):
                                        loss_fn_charges = loss_fn_charges,
                                        loss_fn_pdg= loss_fn_pdgs,
                                        loss_fn_cont= loss_fn_cont,
-                                       nlog_epoch = period_train,
-                                       loss_evo = losses_evolution)
+                                       nlog_period_epoch = nlog_period_train,
+                                       loss_evo = losses_evolution,
+                                       epoch = i)
         time_epoch = time() - start_time 
         logging.info("Finished training for one epoch, going to valiation")
         # val_loss_epoch, charges_val, pdgs_val,cont_val = validate_epoch(model,
@@ -422,8 +438,9 @@ def train_and_validate(config):
                                        loss_fn_charges = loss_fn_charges,
                                        loss_fn_pdg= loss_fn_pdgs,
                                        loss_fn_cont= loss_fn_cont,
-                                       nlog_epoch = period_val,
-                                       loss_evo = losses_evolution) 
+                                       nlog_period_epoch = nlog_period_val,
+                                        loss_evo = losses_evolution,
+                                        epoch = i) 
 
         # losses_evolution["train"][i] = train_loss_epoch
         # losses_evolution["val"][i] = val_loss_epoch
