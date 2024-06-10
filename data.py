@@ -343,7 +343,7 @@ class CollectionHitsInference(Dataset):
 #         return DataLoader(data_set, batch_size = batch_size)
 #     else:
 #         raise ValueError(model_mode + " is an invalid entry. Must be either training or inference")    
-def get_data(dir_path_train, dir_path_val, batch_size, frac_files,model_mode:str):
+def get_data(dir_path, batch_size, frac_files,model_mode:str):
     special_symbols = {
             "pad": {"cont": [0.,1.],"CEL":-150},
             "bos": {"cont": [1.,1.], "CEL":-100},
@@ -351,6 +351,7 @@ def get_data(dir_path_train, dir_path_val, batch_size, frac_files,model_mode:str
             "sample": [0.,0.]
     }
     if model_mode == "training":
+        dir_path_train, dir_path_val = dir_path
         data_set_train = CollectionHitsTraining(dir_path_train,special_symbols, frac_files)
         data_set_val = CollectionHitsTraining(dir_path_val, special_symbols, frac_files)
         vocab_charges, vocab_pdgs = data_set_train.vocab_charges, data_set_train.vocab_pdgs
@@ -368,8 +369,9 @@ def get_data(dir_path_train, dir_path_val, batch_size, frac_files,model_mode:str
                 DataLoader(data_set_val, batch_size= batch_size))    
 
     elif model_mode == "inference":
-        data_set = CollectionHitsInference(dir_path, special_symbols)
-        return DataLoader(data_set, batch_size = batch_size)
+        data_set = CollectionHitsTraining(dir_path, special_symbols, frac_files)
+        E_label_RMSNormalizer = data_set.E_label_RMS_normalizer
+        return special_symbols, E_label_RMSNormalizer, DataLoader(data_set, batch_size = batch_size)
     else:
         raise ValueError(model_mode + " is an invalid entry. Must be either training or inference")    
 
@@ -384,7 +386,7 @@ special_symbols = {
 testing = False
 if testing:
     dir_path = "/Users/paulwahlen/Desktop/Internship/ML/Code/TransfoV1/data"
-    vocab_charges, vocab_pgs, special_symbols,E_label_RMSNormalizer, data_ld, val_dl = get_data(dir_path,dir_path,25,0.1, "training")
+    vocab_charges, vocab_pgs, special_symbols,E_label_RMSNormalizer, data_ld, val_dl = get_data((dir_path,dir_path),25,0.1, "training")
     feat0,label0 = next(iter(data_ld))
     print(feat0[0,0:30])
     print(torch.max(feat0[0]))

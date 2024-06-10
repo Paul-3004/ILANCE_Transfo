@@ -27,14 +27,14 @@ def count_params_model(nlayers_encoder, nlayers_decoder, nlayers_embedding, d_ff
     return params
 
 params_all_you_need = count_params_model(6,6,2,2048,6,12,6,512)
-params_current =  count_params_model(nlayers_encoder = 1,
-                                     nlayers_decoder = 1,
+params_current =  count_params_model(nlayers_encoder = 3,
+                                     nlayers_decoder = 3,
                                      nlayers_embedding = 2,
-                                     d_ff = 512,
+                                     d_ff = 256,
                                      d_charges = 6,
                                      d_PDGs = 12,
                                      d_cont = 6,
-                                     d_model = 256,
+                                     d_model = 128,
                                      d_init_decoder = 8,
                                      d_init_encoder = 6)
 

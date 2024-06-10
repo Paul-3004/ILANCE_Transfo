@@ -23,6 +23,14 @@ def get_loss_log_freq(nlog_per_epoch,nbatches):
     nlog_update = nbatches // period
     return {"period": period, "nlog": nlog_update}
 
+def add_pad(input, pad_tokens, size):
+    nhits_input = input.shape[1]
+    diff_size = nhits_input - size
+    if diff_size < 0:
+        pad = pad_tokens.repeat(input.shape[0], diff_size,pad_tokens.shape[0])
+        input = torch.cat([input, pad], dim = 1)
+    return input
+
 '''
 Feeds the input to the model and outputs the translated version by a greedy algorithm. 
 Each tokens per event is predicted sequentially, until either all the events were given an eos token or 
@@ -60,7 +68,7 @@ def greedy_func(model,src,src_padding_mask,vocab_charges, ncluster_max: int, spe
     tgt_key_padding_mask = torch.zeros(batch_size,1).type(torch.bool).to(DEVICE)
     is_done = torch.zeros(batch_size,1).type(torch.bool) #to keep track of which event has eos token
     is_done_prev = is_done #to keep track of previous status of eos tokens
-    for _ in range(ncluster_max-1):
+    for _ in range(ncluster_max):
         #Feeding previous decoder output as input
         out_decoder = model.decoder(clusters_transfo, memory, tgt_key_padding_mask, src_padding_mask)
         #Computing the logits, only considering the last row. 
@@ -102,7 +110,7 @@ def greedy_func(model,src,src_padding_mask,vocab_charges, ncluster_max: int, spe
                                          next_pdgs_batch.unsqueeze(-1),
                                          next_DOF_cont_batch), dim = -1) 
         #Need to change the next cluster of every event which was done previously to a pad
-        pad  = torch.tensor([0]*nfeats_labels + special_symbols["pad"]["cont"])
+        pad  = torch.tensor([0]*nfeats_labels + special_symbols["pad"]["cont"]).to(DEVICE)
         pad.put_([0,1], special_symbols["pad"]["CEL"])
         next_charges_batch[is_done_prev] = pad
         #Updating the tgt_padding_mask
@@ -112,14 +120,15 @@ def greedy_func(model,src,src_padding_mask,vocab_charges, ncluster_max: int, spe
         is_done_prev = torch.clone(is_done)
 
         if torch.all(is_done):
+            clusters_transfo = add_pad(clusters_transfo, pad, ncluster_max)
             break
 
     return clusters_transfo
 
-def inference(opts):
+def inference(config):
     
-    vocab_charges = Vocab.from_dict(torch.load(opts.path_charges))
-    vocab_pdgs = Vocab.from_dict(torch.load(opts.path_PDGs))
+    vocab_charges = Vocab.from_dict(torch.load(config["path_charges"]))
+    vocab_pdgs = Vocab.from_dict(torch.load(config["path_PDGs"]))
 
     #Creating model
     model = ClustersFinder(
@@ -137,17 +146,20 @@ def inference(opts):
         device = DEVICE
     ).to(DEVICE)
     #Loading weights
-    model.load_state_dict(torch.load(opts.model_path))
+    model.load_state_dict(torch.load(config["dir_model"]))
     model.eval()
     
-    special_symbols, src_loader = get_data(opts.data_path_inference,opts.data_path_inference, opts.batch_size, "inference")
-
-    
-    for src in src_loader:
+    special_symbols, E_label_RMS_normalizer, src_loader = get_data((config["dir_path_train"], ), config["batch_size"], config["frac_files"], "inference")
+    output = torch.tensor([])
+    for i,(src,_) in enumerate(src_loader):
         src_padding_mask, _ = create_mask(src,torch.tensor([0]), special_symbols["pad"]["cont"],DEVICE)
-        clusters_out = greedy_func(model, src,src_padding_mask,opts.ncluster_max,special_symbols,opts.nfeats_labels)
+        clusters_out = greedy_func(model, src,src_padding_mask,config["ncluster_max"],special_symbols,config["output_DOF_continuous"])
         clusters_out[...,0] = vocab_charges.indices_to_tokens(clusters_out[...,0])
         clusters_out[...,1] = vocab_pdgs.indices_to_tokens(clusters_out[...,1]) 
+        clusters_out[...,2] = E_label_RMS_normalizer.inverse_normalize(clusters_out[...,2])
+        output[i] = clusters_out
+    
+    torch.save(output, config["dir_results"] + "prediction.pt")
 
 
 
@@ -332,7 +344,7 @@ def train_and_validate(config):
     logging.getLogger().addHandler(console)
 
     logging.info("Getting the training data from" +config["dir_path_train"])
-    vocab_charges, vocab_pdgs, special_symbols, _, train_dl, val_dl = get_data(config["dir_path_train"], config["dir_path_val"], config["batch_size"], config["frac_files"], "training")
+    vocab_charges, vocab_pdgs, special_symbols, _, train_dl, val_dl = get_data((config["dir_path_train"], config["dir_path_val"]), config["batch_size"], config["frac_files"], "training")
     torch.save(vocab_charges.vocab, config["dir_results"] + "vocab_charges.pt")
     torch.save(vocab_pdgs.vocab, config["dir_results"] + "vocab_PDGs.pt")
     
