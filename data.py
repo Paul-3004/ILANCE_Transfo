@@ -369,7 +369,8 @@ def get_data(dir_path, batch_size, frac_files,model_mode:str):
                 DataLoader(data_set_val, batch_size= batch_size))    
 
     elif model_mode == "inference":
-        data_set = CollectionHitsTraining(dir_path, special_symbols, frac_files)
+        dir_path_inference = dir_path[0]
+        data_set = CollectionHitsTraining(dir_path_inference, special_symbols, frac_files)
         E_label_RMSNormalizer = data_set.E_label_RMS_normalizer
         return special_symbols, E_label_RMSNormalizer, DataLoader(data_set, batch_size = batch_size)
     else:

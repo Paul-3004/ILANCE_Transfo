@@ -12,7 +12,7 @@ from model import ClustersFinder
 from argparse import ArgumentParser
 import json
 import logging
-DEVICE = torch.device('cuda:5' if torch.cuda.is_available() else 'cpu')
+DEVICE = torch.device('cuda:6' if torch.cuda.is_available() else 'cpu')
 
 
 def get_loss_log_freq(nlog_per_epoch,nbatches):
@@ -54,85 +54,105 @@ args:
     nfeats_labels: int, number of labels features 
 
 '''
-def greedy_func(model,src,src_padding_mask,vocab_charges, ncluster_max: int, special_symbols: dict, nfeats_labels: int = 6):
-    src = src.to(DEVICE)
-    src_padding_mask = src_padding_mask.to(DEVICE)
+def greedy_func(model,src,vocab_charges, ncluster_max: int, special_symbols: dict, nfeats_labels: int = 6, dtype = torch.float32):
+    with torch.no_grad():
+        src = src.to(DEVICE)
+        #src_padding_mask = src_padding_mask.to(DEVICE)
 
-    #feeding source to encoder
-    memory = model.encode(src,src_padding_mask).to(DEVICE)
-    #Creating <bos> token
-    bos = torch.tensor([0]*nfeats_labels + special_symbols["bos"]["cont"]).to(DEVICE)
-    bos.put_([0,1], special_symbols["bos"]["CEL"])
-
-    batch_size = src.size[0]
-    clusters_transfo = torch.tile(bos,(batch_size,1)).to(DEVICE) #output of decoder, then updated to input decoder
-    tgt_key_padding_mask = torch.zeros(batch_size,1).type(torch.bool).to(DEVICE)
-    is_done = torch.zeros(batch_size,1).type(torch.bool).to(DEVICE) #to keep track of which event has eos token
-    is_done_prev = torch.clone(is_done) #to keep track of previous status of eos tokens
-    for _ in range(ncluster_max):
-        #Feeding previous decoder output as input
-        out_decoder = model.decoder(clusters_transfo, memory, tgt_key_padding_mask, src_padding_mask)
-        #Computing the logits, only considering the last row. 
-        logits_charges_batch = model.lastlin_charges(out_decoder)[:,-1] #shape is [N,T,F]
-        logits_pdg_batch = model.lastlin_pdg(out_decoder)[:,-1]
-        next_DOF_cont_batch = model.lastlin_cont(out_decoder)[:,-1]
-
-        #no need to apply softmax since it's a bijection, and no need to print probabilities
-        next_charges_batch = torch.argmax(logits_charges_batch) #class id same as index by construction
-        next_pdgs_batch = torch.argmax(logits_pdg_batch) #class id same as index by construction
-
-        #Addding special tokens of cont. DOF, ignoring the values if event has already <eos>
-        new_eos_tokens_batch = ( (next_charges_batch == vocab_charges.get_index(special_symbols["eos"]["CEL"])) * ~is_done_prev)
-        new_bos_tokens_batch = ( (next_charges_batch == vocab_charges.get_index(special_symbols["bos"]["CEL"])) * ~is_done_prev)
-        new_sample_tokens_batch = ~new_eos_tokens_batch * ~new_bos_tokens_batch
-
-        #Using spherical coordinates to get 3D direction vectors
-        next_DOF_cont_batch_sin_theta = torch.sin(next_DOF_cont_batch[...,0])
-        next_DOF_cont_batch[...,0] = torch.cos(next_DOF_cont_batch[...,1]) * next_DOF_cont_batch_sin_theta
-        next_DOF_cont_batch[...,1] = torch.sin(next_DOF_cont_batch[...,1]) * next_DOF_cont_batch_sin_theta
-        next_DOF_cont_batch = torch.concat([next_DOF_cont_batch, torch.cos(next_DOF_cont_batch[...,0]).unsqueeze_(-1)], dim = -1)
-
-        if torch.count_nonzero(new_eos_tokens_batch) > 0:
-            is_done[is_done_prev == False] = new_eos_tokens_batch[is_done_prev == False]
-            next_DOF_cont_batch[new_eos_tokens_batch] = torch.cat(( next_DOF_cont_batch[new_eos_tokens_batch], 
-                                                                special_symbols["eos"]["cont"] ), 
-                                                                dim = -1)
-        #shouldn't be predicted but just in case
-        if torch.count_nonzero(new_bos_tokens_batch) > 0:
-            next_DOF_cont_batch[new_bos_tokens_batch] = torch.cat(( next_DOF_cont_batch[new_bos_tokens_batch], 
-                                                                special_symbols["bos"]["cont"] ), 
-                                                                dim = -1)
-        if torch.count_nonzero(new_sample_tokens_batch) > 0:
-            next_DOF_cont_batch[new_sample_tokens_batch] = torch.cat(( next_DOF_cont_batch[new_sample_tokens_batch],
-                                                                    special_symbols["sample"] ), 
-                                                                    dim = -1)
+        #Creating <bos> token
+        bos_np = np.array([0]*nfeats_labels + special_symbols["bos"]["cont"])
+        np.put(bos_np,[0,1], vocab_charges.get_index(special_symbols["bos"]["CEL"]))
+        bos = torch.from_numpy(bos_np).to(device = DEVICE, dtype = dtype)
         
-        next_clusters_batch = torch.cat((next_charges_batch.unsqueeze(-1), 
-                                         next_pdgs_batch.unsqueeze(-1),
-                                         next_DOF_cont_batch), dim = -1) 
-        #Need to change the next cluster of every event which was done previously to a pad
-        pad  = torch.tensor([0]*nfeats_labels + special_symbols["pad"]["cont"]).to(DEVICE)
-        pad.put_([0,1], special_symbols["pad"]["CEL"])
-        next_charges_batch[is_done_prev] = pad
-        #Updating the tgt_padding_mask
-        tgt_key_padding_mask = torch.hstack([tgt_key_padding_mask, is_done_prev.unsqueeze(-1)])
+        #pad_np  = np.array([0]*nfeats_labels + special_symbols["pad"]["cont"])
+        #np.put(pad_np,[0,1], special_symbols["pad"]["CEL"])
+        #pad = torch.from_numpy(pad_np).to(device = DEVICE, dtype = dtype)
+        
+        batch_size = src.shape[0]
+        clusters_transfo = torch.tile(bos,(batch_size,1)).to(DEVICE).unsqueeze_(1) #output of decoder, then updated to input decoder
+        src_padding_mask, tgt_key_padding_mask = create_mask(src,clusters_transfo, special_symbols["pad"]["cont"],DEVICE)
+        #feeding source to encoder
+        memory = model.encode(src,src_padding_mask).to(DEVICE)
+        #tgt_key_padding_mask = torch.zeros(batch_size,1).type(torch.bool).to(DEVICE)
+        is_done = torch.zeros(batch_size,1).type(torch.bool).to(DEVICE) #to keep track of which event has eos token
+        is_done_prev = torch.clone(is_done) #to keep track of previous status of eos tokens
+        for _ in range(ncluster_max):
+            #Feeding previous decoder output as input
+            out_decoder = model.decode(clusters_transfo, memory, tgt_key_padding_mask, src_padding_mask)
+            #Computing the logits, only considering the last row. 
+            logits_charges_batch = model.lastlin_charge(out_decoder)[:,-1] #shape is [N,T,F]
+            logits_pdg_batch = model.lastlin_pdg(out_decoder)[:,-1]
+            next_DOF_cont_batch = model.lastlin_cont(out_decoder)[:,-1]
+        
+            #no need to apply softmax since it's a bijection, and no need to print probabilities
+            next_charges_batch = torch.argmax(logits_charges_batch, dim = 1, keepdim = True) #class id same as index by construction
+            next_pdgs_batch = torch.argmax(logits_pdg_batch, dim = 1, keepdim = True) #class id same as index by construction
+            
+            #Addding special tokens of cont. DOF, ignoring the values if event has already <eos>
+            new_eos_tokens_batch = ( (next_charges_batch == vocab_charges.get_index(special_symbols["eos"]["CEL"])) * ~is_done_prev)
+            new_bos_tokens_batch = ( (next_charges_batch == vocab_charges.get_index(special_symbols["bos"]["CEL"])) * ~is_done_prev)
+            new_sample_tokens_batch = ~new_eos_tokens_batch * ~new_bos_tokens_batch
+            #Using spherical coordinates to get 3D direction vectors
+            next_DOF_cont_batch_sin_theta = torch.sin(next_DOF_cont_batch[...,0])
+            next_DOF_cont_batch[...,0] = torch.cos(next_DOF_cont_batch[...,1]) * next_DOF_cont_batch_sin_theta
+            next_DOF_cont_batch[...,1] = torch.sin(next_DOF_cont_batch[...,1]) * next_DOF_cont_batch_sin_theta
+            next_DOF_cont_batch = torch.concat([next_DOF_cont_batch, torch.cos(next_DOF_cont_batch[...,0]).unsqueeze_(-1)], dim = -1)
+            next_DOF_cont_batch_spe = torch.zeros((batch_size, next_DOF_cont_batch.shape[-1] + 2), device = DEVICE, dtype = dtype)
+            n_new_eos = torch.count_nonzero(new_eos_tokens_batch)
+            if  n_new_eos> 0:
+                is_done[is_done_prev == False] = new_eos_tokens_batch[is_done_prev == False]
+                next_DOF_cont_batch_spe[new_eos_tokens_batch.squeeze(-1)] = torch.cat(( next_DOF_cont_batch[new_eos_tokens_batch.squeeze(-1)], 
+                                                                                        torch.tensor(special_symbols["eos"]["cont"], device = DEVICE).repeat(n_new_eos,1) ), 
+                                                                                      dim = -1)
+                #shouldn't be predicted but just in case
+            n_new_bos = torch.count_nonzero(new_bos_tokens_batch)
+            if  n_new_bos > 0:
+                next_DOF_cont_batch_spe[new_bos_tokens_batch.squeeze(-1)] = torch.cat(( next_DOF_cont_batch[new_bos_tokens_batch.squeeze(-1)], 
+                                                                                        torch.tensor(special_symbols["bos"]["cont"], device = DEVICE).repeat(n_new_bos,1) ), 
+                                                                                        dim = -1)
+            n_new_samples = torch.count_nonzero(new_sample_tokens_batch)
+            if  n_new_samples > 0:
+                next_DOF_cont_batch_spe[new_sample_tokens_batch.squeeze(-1)] = torch.cat(( next_DOF_cont_batch[new_sample_tokens_batch.squeeze(-1)],
+                                                                                           torch.tensor(special_symbols["sample"], device = DEVICE).repeat(n_new_samples,1)),
+                                                                                           dim = -1)
 
-        clusters_transfo = torch.concat([clusters_transfo, next_clusters_batch.unsqueeze(1)], dim = 1)
-        is_done_prev = torch.clone(is_done)
-        print(f"Memory allocated: {torch.cuda.memory_allocated()}")
-
-        if torch.all(is_done):
-            clusters_transfo = add_pad(clusters_transfo, pad, ncluster_max)
-            break
+        
+            next_clusters_batch = torch.cat((next_charges_batch, 
+                                             next_pdgs_batch,
+                                             next_DOF_cont_batch_spe), dim = -1) 
+            #Need to change the next cluster of every event which was done previously to a pad
+            #if torch.all(~is_done_prev):
+            next_charges_batch[is_done_prev] = vocab_charges.get_index(special_symbols["pad"]["CEL"])
+            #Updating the tgt_padding_mask
+            tgt_key_padding_mask = torch.hstack([tgt_key_padding_mask, is_done_prev])
+            
+            clusters_transfo = torch.concat([clusters_transfo, next_clusters_batch.unsqueeze(1)], dim = 1)
+            is_done_prev = torch.clone(is_done)
+            print(f"Memory allocated: {torch.cuda.memory_allocated(device = DEVICE)}")
+            
+            if torch.all(is_done):
+                clusters_transfo = add_pad(clusters_transfo, pad, ncluster_max)
+                break
 
     return clusters_transfo
 
 def inference(config):
+    logger = logging.getLogger(__name__)
+    logging.basicConfig(filename= config["dir_results"] + "log_inference.txt", level= logging.INFO)
+    file_handler = logging.FileHandler(logger.name, mode = 'w')
+    logger.addHandler(file_handler)
+
+    console = logging.StreamHandler()
+    console.setLevel(logging.INFO)
+    logging.getLogger().addHandler(console)
     logging.info("Inference chosen...")
     logging.info("Loading the vocabularies...")
-    vocab_charges = Vocab.from_dict(torch.load(config["path_charges"]))
-    vocab_pdgs = Vocab.from_dict(torch.load(config["path_PDGs"]))
+    vocab_charges = Vocab.from_dict(torch.load(config["path_charges"] + "vocab_charges.pt"))
+    vocab_pdgs = Vocab.from_dict(torch.load(config["path_PDGs"] + "vocab_PDGs.pt"))
 
+    if config["dtype"] == "torch.float32":
+        dtype = torch.float32
+        
     #Creating model
     model = ClustersFinder(
         dmodel = config["dmodel"],
@@ -146,21 +166,23 @@ def inference(config):
         nparticles_max= len(vocab_pdgs),
         ncharges_max= len(vocab_charges),
         DOF_continous= config["output_DOF_continuous"],
-        device = DEVICE
+        device = DEVICE,
+        dtype = dtype
     ).to(DEVICE)
     #Loading weights
-    model.load_state_dict(torch.load(config["dir_model"]))
+    model.load_state_dict(torch.load(config["dir_model"] + "best_model.pt"))
     model.eval()
     logging.info(f"Model created on {model.device}, now loading the source")
     
     special_symbols, E_label_RMS_normalizer, src_loader = get_data((config["dir_path_inference"], ), config["batch_size"], config["frac_files"], "inference")
+    print(special_symbols)
     pred = []
     labels = []
     logging.info("Going to inference now")
     for src, tgt in src_loader:
         start_time = time()
-        src_padding_mask, _ = create_mask(src,torch.tensor([0]), special_symbols["pad"]["cont"],DEVICE)
-        clusters_out = greedy_func(model, src,src_padding_mask,config["ncluster_max"],special_symbols,config["output_DOF_continuous"])
+        clusters_out = greedy_func(model, src,vocab_charges,config["ncluster_max"],special_symbols,config["d_input_decoder"] -2, dtype).to("cpu")
+        print(clusters_out.device)
         clusters_out[...,0] = vocab_charges.indices_to_tokens(clusters_out[...,0])
         clusters_out[...,1] = vocab_pdgs.indices_to_tokens(clusters_out[...,1]) 
         clusters_out[...,2] = E_label_RMS_normalizer.inverse_normalize(clusters_out[...,2])
@@ -169,7 +191,7 @@ def inference(config):
         delta_t = time() - start_time
         logging.info(f"Batch done in {delta_t} seconds")
     
-    output = torch.cat(output, dim = 0)
+    output = torch.cat(pred, dim = 0)
     torch.save(output, config["dir_results"] + "prediction.pt")
     labels = torch.cat(labels, dim = 0)
     torch.save(output, config["dir_results"] + "labels.pt")
