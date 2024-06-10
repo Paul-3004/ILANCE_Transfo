@@ -233,10 +233,10 @@ def train_epoch(model, optim, train_dl, special_symbols,vocab_charges, vocab_pdg
         if (i + 1) % period == 0:
             #logging.info(f"recording the losses, training, minibatch = {i + 1}")
             #print(nlog_epoch)
-            loss_evo["train"][nlog_epoch *epoch + count_log] = loss_epoch / nlog_epoch
-            loss_evo["charges_train"][nlog_epoch *epoch + count_log] = loss_epoch_charges / nlog_epoch
-            loss_evo["pdgs_train"][nlog_epoch *epoch + count_log] = loss_epoch_pdgs / nlog_epoch
-            loss_evo["cont_train"][nlog_epoch *epoch + count_log] = loss_epoch_cont / nlog_epoch
+            loss_evo["train"][nlog_epoch *epoch + count_log] = loss_epoch / period
+            loss_evo["charges_train"][nlog_epoch *epoch + count_log] = loss_epoch_charges / period
+            loss_evo["pdgs_train"][nlog_epoch *epoch + count_log] = loss_epoch_pdgs / period
+            loss_evo["cont_train"][nlog_epoch *epoch + count_log] = loss_epoch_cont / period
             loss_epoch = 0.
             loss_epoch_charges = 0.
             loss_epoch_pdgs = 0.
@@ -308,10 +308,10 @@ def validate_epoch(model, val_dl, special_symbols,vocab_charges, vocab_pdgs,
 
             if (i + 1) % log_period == 0:
                 #logging.info(f"saving losses validation, minibatch = {i}")
-                loss_evo["val"][nlog_epoch *epoch + count_log] = loss_epoch / nlog_epoch
-                loss_evo["charges_val"][nlog_epoch *epoch + count_log] = loss_epoch_charges / nlog_epoch
-                loss_evo["pdgs_val"][nlog_epoch *epoch + count_log] = loss_epoch_pdgs / nlog_epoch
-                loss_evo["cont_val"][nlog_epoch *epoch + count_log] = loss_epoch_cont / nlog_epoch
+                loss_evo["val"][nlog_epoch *epoch + count_log] = loss_epoch / log_period
+                loss_evo["charges_val"][nlog_epoch *epoch + count_log] = loss_epoch_charges / log_period
+                loss_evo["pdgs_val"][nlog_epoch *epoch + count_log] = loss_epoch_pdgs / log_period
+                loss_evo["cont_val"][nlog_epoch *epoch + count_log] = loss_epoch_cont / log_period
                 loss_epoch = 0.
                 loss_epoch_charges = 0.
                 loss_epoch_pdgs = 0.
