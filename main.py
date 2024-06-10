@@ -192,9 +192,9 @@ def inference(config):
         logging.info(f"Batch done in {delta_t} seconds")
     
     output = torch.cat(pred, dim = 0)
-    torch.save(output, config["dir_results"] + "prediction.pt")
+    torch.save(pred, config["dir_results"] + "prediction.pt")
     labels = torch.cat(labels, dim = 0)
-    torch.save(output, config["dir_results"] + "labels.pt")
+    torch.save(labels, config["dir_results"] + "labels.pt")
 
 
 
