@@ -2,6 +2,7 @@ import json
 import h5py
 import awkward as ak
 import numpy as np
+import time
 
 def load_awkward2(filename):
     file = h5py.File(filename) #Create File object                                                                                                                                   
@@ -46,7 +47,9 @@ def load_awkwards(filenames):
     assert(len(filenames)>0)
     for i, file in enumerate(filenames):
         print(f"Reading file: {file=}")
+        start = time()
         feat, label = load_awkward2(file)
+        print(time()- start)
         if i==0:
             ak_feats = feat
             ak_labels = label
