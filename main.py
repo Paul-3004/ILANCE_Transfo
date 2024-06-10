@@ -25,9 +25,10 @@ def get_loss_log_freq(nlog_per_epoch,nbatches):
 
 def add_pad(input, pad_tokens, size):
     nhits_input = input.shape[1]
-    diff_size = nhits_input - size
-    if diff_size < 0:
-        pad = pad_tokens.repeat(input.shape[0], diff_size,pad_tokens.shape[0])
+    diff_size = size - nhits_input
+    if diff_size > 0:
+        pad = pad_tokens.repeat(input.shape[0], diff_size,1)
+        print(pad)
         input = torch.cat([input, pad], dim = 1)
     return input
 
@@ -60,14 +61,14 @@ def greedy_func(model,src,src_padding_mask,vocab_charges, ncluster_max: int, spe
     #feeding source to encoder
     memory = model.encode(src,src_padding_mask).to(DEVICE)
     #Creating <bos> token
-    bos = torch.tensor([0]*nfeats_labels + special_symbols["bos"]["cont"])
+    bos = torch.tensor([0]*nfeats_labels + special_symbols["bos"]["cont"]).to(DEVICE)
     bos.put_([0,1], special_symbols["bos"]["CEL"])
 
     batch_size = src.size[0]
     clusters_transfo = torch.tile(bos,(batch_size,1)).to(DEVICE) #output of decoder, then updated to input decoder
     tgt_key_padding_mask = torch.zeros(batch_size,1).type(torch.bool).to(DEVICE)
-    is_done = torch.zeros(batch_size,1).type(torch.bool) #to keep track of which event has eos token
-    is_done_prev = is_done #to keep track of previous status of eos tokens
+    is_done = torch.zeros(batch_size,1).type(torch.bool).to(DEVICE) #to keep track of which event has eos token
+    is_done_prev = torch.clone(is_done) #to keep track of previous status of eos tokens
     for _ in range(ncluster_max):
         #Feeding previous decoder output as input
         out_decoder = model.decoder(clusters_transfo, memory, tgt_key_padding_mask, src_padding_mask)
@@ -114,7 +115,7 @@ def greedy_func(model,src,src_padding_mask,vocab_charges, ncluster_max: int, spe
         pad.put_([0,1], special_symbols["pad"]["CEL"])
         next_charges_batch[is_done_prev] = pad
         #Updating the tgt_padding_mask
-        tgt_key_padding_mask = torch.hstack([src_padding_mask, is_done_prev.unsqueeze(-1)])
+        tgt_key_padding_mask = torch.hstack([tgt_key_padding_mask, is_done_prev.unsqueeze(-1)])
 
         clusters_transfo = torch.concat([clusters_transfo, next_clusters_batch.unsqueeze(1)], dim = 1)
         is_done_prev = torch.clone(is_done)
@@ -150,15 +151,16 @@ def inference(config):
     model.eval()
     
     special_symbols, E_label_RMS_normalizer, src_loader = get_data((config["dir_path_train"], ), config["batch_size"], config["frac_files"], "inference")
-    output = torch.tensor([])
+    output = []
     for i,(src,_) in enumerate(src_loader):
         src_padding_mask, _ = create_mask(src,torch.tensor([0]), special_symbols["pad"]["cont"],DEVICE)
         clusters_out = greedy_func(model, src,src_padding_mask,config["ncluster_max"],special_symbols,config["output_DOF_continuous"])
         clusters_out[...,0] = vocab_charges.indices_to_tokens(clusters_out[...,0])
         clusters_out[...,1] = vocab_pdgs.indices_to_tokens(clusters_out[...,1]) 
         clusters_out[...,2] = E_label_RMS_normalizer.inverse_normalize(clusters_out[...,2])
-        output[i] = clusters_out
+        output.append(clusters_out)
     
+    output = torch.cat(output, dim = 0)
     torch.save(output, config["dir_results"] + "prediction.pt")
 
 
