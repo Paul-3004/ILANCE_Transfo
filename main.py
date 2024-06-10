@@ -119,6 +119,7 @@ def greedy_func(model,src,src_padding_mask,vocab_charges, ncluster_max: int, spe
 
         clusters_transfo = torch.concat([clusters_transfo, next_clusters_batch.unsqueeze(1)], dim = 1)
         is_done_prev = torch.clone(is_done)
+        print(f"Memory allocated: {torch.cuda.memory_allocated()}")
 
         if torch.all(is_done):
             clusters_transfo = add_pad(clusters_transfo, pad, ncluster_max)
@@ -127,7 +128,8 @@ def greedy_func(model,src,src_padding_mask,vocab_charges, ncluster_max: int, spe
     return clusters_transfo
 
 def inference(config):
-    
+    logging.info("Inference chosen...")
+    logging.info("Loading the vocabularies...")
     vocab_charges = Vocab.from_dict(torch.load(config["path_charges"]))
     vocab_pdgs = Vocab.from_dict(torch.load(config["path_PDGs"]))
 
@@ -149,19 +151,28 @@ def inference(config):
     #Loading weights
     model.load_state_dict(torch.load(config["dir_model"]))
     model.eval()
+    logging.info(f"Model created on {model.device}, now loading the source")
     
-    special_symbols, E_label_RMS_normalizer, src_loader = get_data((config["dir_path_train"], ), config["batch_size"], config["frac_files"], "inference")
-    output = []
-    for i,(src,_) in enumerate(src_loader):
+    special_symbols, E_label_RMS_normalizer, src_loader = get_data((config["dir_path_inference"], ), config["batch_size"], config["frac_files"], "inference")
+    pred = []
+    labels = []
+    logging.info("Going to inference now")
+    for src, tgt in src_loader:
+        start_time = time()
         src_padding_mask, _ = create_mask(src,torch.tensor([0]), special_symbols["pad"]["cont"],DEVICE)
         clusters_out = greedy_func(model, src,src_padding_mask,config["ncluster_max"],special_symbols,config["output_DOF_continuous"])
         clusters_out[...,0] = vocab_charges.indices_to_tokens(clusters_out[...,0])
         clusters_out[...,1] = vocab_pdgs.indices_to_tokens(clusters_out[...,1]) 
         clusters_out[...,2] = E_label_RMS_normalizer.inverse_normalize(clusters_out[...,2])
-        output.append(clusters_out)
+        pred.append(clusters_out)
+        labels.append(tgt)
+        delta_t = time() - start_time
+        logging.info(f"Batch done in {delta_t} seconds")
     
     output = torch.cat(output, dim = 0)
     torch.save(output, config["dir_results"] + "prediction.pt")
+    labels = torch.cat(labels, dim = 0)
+    torch.save(output, config["dir_results"] + "labels.pt")
 
 
 
