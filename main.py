@@ -12,7 +12,7 @@ from model import ClustersFinder
 from argparse import ArgumentParser
 import json
 import logging
-DEVICE = torch.device('cuda:6' if torch.cuda.is_available() else 'cpu')
+DEVICE = torch.device('cuda:4' if torch.cuda.is_available() else 'cpu')
 
 
 def get_loss_log_freq(nlog_per_epoch,nbatches):
