@@ -38,6 +38,23 @@ def translate(input, vocab_charges, vocab_pdgs, rms_normalizer):
     input[...,2] = rms_normalizer.inverse_normalize(input[...,2])
 
 '''
+Transforms a 3D unit vector encoded by theta and phi to a 3D vector in cartesian coordinates.
+args:
+    input: output of decoder, with energy (to avoid another concatenation afterwards)
+           features are in order (E, theta, phi)
+'''
+def get_cartesian_from_angles(input):
+    #logits: (E, theta, phi)
+    theta = input[...,-2]
+    phi = input[...,-1]
+    sin_theta = torch.sin(theta) 
+    nx = torch.cos(phi) * sin_theta
+    ny = torch.sin(phi) * sin_theta
+    return torch.concat([input[...,0].unsqueeze(-1),
+                         nx.unsqueeze(-1),
+                         ny.unsqueeze(-1), 
+                         torch.cos(theta).unsqueeze(-1)], dim = -1)
+'''
 Feeds the input to the model and outputs the translated version by a greedy algorithm. 
 Each tokens per event is predicted sequentially, until either all the events were given an eos token or 
 the max number of predictable clusters was reached (ncluster_max). 
@@ -102,10 +119,7 @@ def greedy_func(model,src,vocab_charges, ncluster_max: int, special_symbols: dic
             new_bos_tokens_batch = ( (next_charges_batch == vocab_charges.get_index(special_symbols["bos"]["CEL"])) * ~is_done_prev).squeeze(-1)
             new_sample_tokens_batch = ~new_eos_tokens_batch * ~new_bos_tokens_batch
             #Using spherical coordinates to get 3D direction vectors
-            next_DOF_cont_batch_sin_theta = torch.sin(next_DOF_cont_batch[...,0])
-            next_DOF_cont_batch[...,0] = torch.cos(next_DOF_cont_batch[...,1]) * next_DOF_cont_batch_sin_theta
-            next_DOF_cont_batch[...,1] = torch.sin(next_DOF_cont_batch[...,1]) * next_DOF_cont_batch_sin_theta
-            next_DOF_cont_batch = torch.concat([next_DOF_cont_batch, torch.cos(next_DOF_cont_batch[...,0]).unsqueeze_(-1)], dim = -1)
+            next_DOF_cont_batch = get_cartesian_from_angles(next_DOF_cont_batch)
             next_DOF_cont_batch_spe = torch.zeros((batch_size, next_DOF_cont_batch.shape[-1] + 2), device = DEVICE, dtype = dtype)
             n_new_eos = torch.count_nonzero(new_eos_tokens_batch)
             if  n_new_eos> 0:
@@ -236,10 +250,7 @@ def train_epoch(model, optim, train_dl, special_symbols,vocab_charges, vocab_pdg
         tgt_out_pdg = tgt_out[...,1].to(torch.long)
         tgt_out_cont = tgt_out[...,2:-2] #only (E, n_x,n_y,n_z)
         #Using spherical coordinates to get 3D direction vectors
-        logits_cont_sin_theta = torch.sin(logits_cont[...,-2]) #logits: (E, theta, phi)
-        logits_cont_nx = torch.cos(logits_cont[...,-1]) * logits_cont_sin_theta
-        logits_cont_ny = torch.sin(logits_cont[...,2]) * logits_cont_sin_theta
-        logits_cont = torch.concat([logits_cont[...,0].unsqueeze(-1),logits_cont_nx.unsqueeze(-1),logits_cont_ny.unsqueeze(-1),  torch.cos(logits_cont[...,1]).unsqueeze(-1)], dim = -1)
+        logits_cont = get_cartesian_from_angles(logits_cont)
         #special_tokens are not taken into account in the continuous loss
         eos_bos_mask = ((tgt_out_charges == vocab_charges.get_index(special_symbols["eos"]["CEL"]))
                         + (tgt_out_charges == vocab_charges.get_index(special_symbols["bos"]["CEL"]))) 
@@ -311,14 +322,7 @@ def validate_epoch(model, val_dl, special_symbols,vocab_charges, vocab_pdgs,
             tgt_out_pdg = tgt_out[...,1].to(torch.long)
             tgt_out_cont = tgt_out[...,2:-2] #only (E, n_x,n_y,n_z)
             #Using spherical coordinates to get 3D direction vectors
-            logits_cont_sin_theta = torch.sin(logits_cont[...,-2]) #logits: (E, theta, phi)
-            logits_cont_nx = torch.cos(logits_cont[...,-1]) * logits_cont_sin_theta
-            logits_cont_ny = torch.sin(logits_cont[...,2]) * logits_cont_sin_theta
-            logits_cont = torch.concat([logits_cont[...,0].unsqueeze(-1),
-                                        logits_cont_nx.unsqueeze(-1),
-                                        logits_cont_ny.unsqueeze(-1),  
-                                        torch.cos(logits_cont[...,1]).unsqueeze(-1)], 
-                                       dim = -1)
+            logits_cont = get_cartesian_from_angles(logits_cont)
             #special_tokens are not taken into account in the continuous loss
             eos_bos_mask = ((tgt_out_charges == vocab_charges.get_index(special_symbols["eos"]["CEL"]))
                             + (tgt_out_charges == vocab_charges.get_index(special_symbols["bos"]["CEL"]))) 
