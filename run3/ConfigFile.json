@@ -9,7 +9,7 @@
     "dir_path_val":  "/data/suehara/mldata/pfa/ntau_10to100GeV_10/validation",
     "epochs": 10,
     "frac_files": 0.02,
-    "frac_files_test": 0.125,
+    "frac_files_test": 0.02,
     "nlog_epoch": 10,
     "lr": 1e-4,
     "batch_size": 10,
