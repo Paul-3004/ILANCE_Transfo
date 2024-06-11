@@ -144,7 +144,6 @@ class CollectionHitsTraining(Dataset):
 
         super(CollectionHitsTraining,self).__init__()
         filenames = list(sorted(glob.iglob(dir_path + '/*.h5')))
-        print(filenames)
         nfiles = ceil(frac_files * len(filenames))
         print(nfiles)
         if nfiles == 1:
@@ -204,6 +203,7 @@ class CollectionHitsTraining(Dataset):
         pvec = labels[...,-3:]
         pvec_norm2 = ak.sum(np.square(pvec), axis = -1) 
         E_label = np.log10(np.sqrt(np.square(labels[...,1]) + pvec_norm2)) # E = sqrt{m^2 + p^2}
+        indices_sort_E = ak.argsort(E_label, axis = -1, ascending= False)
         E_label = self.RMS_normalize(E_label, "E_label")
         cluster_direction = pvec / np.sqrt(pvec_norm2) #normalising momentum
         charges = labels[...,0]
@@ -213,7 +213,7 @@ class CollectionHitsTraining(Dataset):
                                  ak.singletons(E_label, axis = -1), #energy
                                  cluster_direction], #normalised p
                                  axis = -1)
-        
+        labels = labels[indices_sort_E] #sorting by descending energy
         #Normalizing E and positions of feats:
         E_feat = np.log10(feats[...,0])
         E_feat = self.RMS_normalize(E_feat, "E_feats")
@@ -389,15 +389,15 @@ if testing:
     dir_path = "/Users/paulwahlen/Desktop/Internship/ML/Code/TransfoV1/data"
     vocab_charges, vocab_pgs, special_symbols,E_label_RMSNormalizer, data_ld, val_dl = get_data((dir_path,dir_path),25,0.1, "training")
     feat0,label0 = next(iter(data_ld))
-    print(feat0[0,0:30])
+    print(label0[0,:,2])
     print(torch.max(feat0[0]))
-    print(label0[0].size(dim = 0))
-    print(vocab_charges.indices_to_tokens(label0[0,:,0]))
+    #print(label0[0].size(dim = 0))
+    #print(vocab_charges.indices_to_tokens(label0[0,:,0]))
     #print(feats0[0])
     #print(torch.square(label0[0][...,3]) + torch.square(label0[0][...,4]) + torch.square(label0[0][...,5]))
     mean_E =0.
     for i, (batch_feat, batch_label) in enumerate(data_ld):
-        print(batch_feat.size())
+        #print(batch_feat.size())
         mean_E += torch.mean(batch_feat[...,0])     #mean energy
     
     print(mean_E)
