@@ -12,7 +12,7 @@ from model import ClustersFinder
 from argparse import ArgumentParser
 import json
 import logging
-DEVICE = torch.device('cuda:6' if torch.cuda.is_available() else 'cpu')
+DEVICE = torch.device('cuda:5' if torch.cuda.is_available() else 'cpu')
 
 
 def get_loss_log_freq(nlog_per_epoch,nbatches):
@@ -68,10 +68,10 @@ def greedy_func(model,src,vocab_charges, ncluster_max: int, special_symbols: dic
         bos_np = np.array([0]*nfeats_labels + special_symbols["bos"]["cont"])
         np.put(bos_np,[0,1], vocab_charges.get_index(special_symbols["bos"]["CEL"]))
         bos = torch.from_numpy(bos_np).to(device = DEVICE, dtype = dtype)
-
+        
         eos_cont_tensor = torch.tensor(special_symbols["eos"]["cont"], device = DEVICE)
         bos_cont_tensor = torch.tensor(special_symbols["bos"]["cont"], device = DEVICE)
-        sample_cont_tensor = torch.tensor(special_symbols["sample"]["cont"], device = DEVICE)
+        sample_cont_tensor = torch.tensor(special_symbols["sample"], device = DEVICE)
         
         pad_np  = np.array([0]*nfeats_labels + special_symbols["pad"]["cont"])
         np.put(pad_np,[0,1], vocab_charges.get_index(special_symbols["pad"]["CEL"]))
@@ -83,7 +83,7 @@ def greedy_func(model,src,vocab_charges, ncluster_max: int, special_symbols: dic
         #feeding source to encoder
         memory = model.encode(src,src_padding_mask).to(DEVICE)
         #tgt_key_padding_mask = torch.zeros(batch_size,1).type(torch.bool).to(DEVICE)
-        is_done = torch.zeros(batch_size).type(torch.bool).to(DEVICE) #to keep track of which event has eos token
+        is_done = torch.zeros(batch_size,1).type(torch.bool).to(DEVICE) #to keep track of which event has eos token
         is_done_prev = torch.clone(is_done) #to keep track of previous status of eos tokens
         for _ in range(ncluster_max):
             #Feeding previous decoder output as input
@@ -98,8 +98,8 @@ def greedy_func(model,src,vocab_charges, ncluster_max: int, special_symbols: dic
             next_pdgs_batch = torch.argmax(logits_pdg_batch, dim = 1, keepdim = True) #class id same as index by construction
             
             #Addding special tokens of cont. DOF, ignoring the values if event has already <eos>
-            new_eos_tokens_batch = ( (next_charges_batch == vocab_charges.get_index(special_symbols["eos"]["CEL"])) * ~is_done_prev)
-            new_bos_tokens_batch = ( (next_charges_batch == vocab_charges.get_index(special_symbols["bos"]["CEL"])) * ~is_done_prev)
+            new_eos_tokens_batch = ( (next_charges_batch == vocab_charges.get_index(special_symbols["eos"]["CEL"])) * ~is_done_prev).squeeze(-1)
+            new_bos_tokens_batch = ( (next_charges_batch == vocab_charges.get_index(special_symbols["bos"]["CEL"])) * ~is_done_prev).squeeze(-1)
             new_sample_tokens_batch = ~new_eos_tokens_batch * ~new_bos_tokens_batch
             #Using spherical coordinates to get 3D direction vectors
             next_DOF_cont_batch_sin_theta = torch.sin(next_DOF_cont_batch[...,0])
@@ -109,7 +109,7 @@ def greedy_func(model,src,vocab_charges, ncluster_max: int, special_symbols: dic
             next_DOF_cont_batch_spe = torch.zeros((batch_size, next_DOF_cont_batch.shape[-1] + 2), device = DEVICE, dtype = dtype)
             n_new_eos = torch.count_nonzero(new_eos_tokens_batch)
             if  n_new_eos> 0:
-                is_done[is_done_prev == False] = new_eos_tokens_batch[is_done_prev == False]
+                is_done[~is_done_prev] = new_eos_tokens_batch[~is_done_prev.squeeze(-1)]
                 next_DOF_cont_batch_spe[new_eos_tokens_batch] = torch.cat(( next_DOF_cont_batch[new_eos_tokens_batch], 
                                                                                         eos_cont_tensor.repeat(n_new_eos,1) ), 
                                                                                       dim = -1)
@@ -131,9 +131,9 @@ def greedy_func(model,src,vocab_charges, ncluster_max: int, special_symbols: dic
                                              next_DOF_cont_batch_spe), dim = -1) 
             #Need to change the next cluster of every event which was done previously to a pad
             #if torch.all(~is_done_prev):
-            next_clusters_batch[is_done_prev] = pad
+            next_clusters_batch[is_done_prev.squeeze(-1)] = pad
             #Updating the tgt_padding_mask
-            tgt_key_padding_mask = torch.hstack([tgt_key_padding_mask, is_done_prev.unsqueeze(-1)])
+            tgt_key_padding_mask = torch.hstack([tgt_key_padding_mask, is_done_prev])
             
             clusters_transfo = torch.concat([clusters_transfo, next_clusters_batch.unsqueeze(1)], dim = 1)
             is_done_prev = torch.clone(is_done)
