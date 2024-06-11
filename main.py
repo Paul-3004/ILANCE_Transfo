@@ -23,7 +23,7 @@ def get_loss_log_freq(nlog_per_epoch,nbatches):
     nlog_update = nbatches // period
     return {"period": period, "nlog": nlog_update}
 
-def add_pad(input, pad_tokens, size):
+def add_pad_final(input, pad_tokens, size):
     nhits_input = input.shape[1]
     diff_size = size - nhits_input
     if diff_size > 0:
@@ -31,6 +31,11 @@ def add_pad(input, pad_tokens, size):
         print(pad)
         input = torch.cat([input, pad], dim = 1)
     return input
+
+def translate(input, vocab_charges, vocab_pdgs, rms_normalizer):
+    input[...,0] = vocab_charges.indices_to_tokens(input[...,0])
+    input[...,1] = vocab_pdgs.indices_to_tokens(input[...,1])
+    input[...,2] = rms_normalizer.inverse_normalize(input[...,2])
 
 '''
 Feeds the input to the model and outputs the translated version by a greedy algorithm. 
@@ -63,10 +68,14 @@ def greedy_func(model,src,vocab_charges, ncluster_max: int, special_symbols: dic
         bos_np = np.array([0]*nfeats_labels + special_symbols["bos"]["cont"])
         np.put(bos_np,[0,1], vocab_charges.get_index(special_symbols["bos"]["CEL"]))
         bos = torch.from_numpy(bos_np).to(device = DEVICE, dtype = dtype)
+
+        eos_cont_tensor = torch.tensor(special_symbols["eos"]["cont"], device = DEVICE)
+        bos_cont_tensor = torch.tensor(special_symbols["bos"]["cont"], device = DEVICE)
+        sample_cont_tensor = torch.tensor(special_symbols["sample"]["cont"], device = DEVICE)
         
-        #pad_np  = np.array([0]*nfeats_labels + special_symbols["pad"]["cont"])
-        #np.put(pad_np,[0,1], special_symbols["pad"]["CEL"])
-        #pad = torch.from_numpy(pad_np).to(device = DEVICE, dtype = dtype)
+        pad_np  = np.array([0]*nfeats_labels + special_symbols["pad"]["cont"])
+        np.put(pad_np,[0,1], vocab_charges.get_index(special_symbols["pad"]["CEL"]))
+        pad = torch.from_numpy(pad_np).to(device = DEVICE, dtype = dtype)
         
         batch_size = src.shape[0]
         clusters_transfo = torch.tile(bos,(batch_size,1)).to(DEVICE).unsqueeze_(1) #output of decoder, then updated to input decoder
@@ -74,7 +83,7 @@ def greedy_func(model,src,vocab_charges, ncluster_max: int, special_symbols: dic
         #feeding source to encoder
         memory = model.encode(src,src_padding_mask).to(DEVICE)
         #tgt_key_padding_mask = torch.zeros(batch_size,1).type(torch.bool).to(DEVICE)
-        is_done = torch.zeros(batch_size,1).type(torch.bool).to(DEVICE) #to keep track of which event has eos token
+        is_done = torch.zeros(batch_size).type(torch.bool).to(DEVICE) #to keep track of which event has eos token
         is_done_prev = torch.clone(is_done) #to keep track of previous status of eos tokens
         for _ in range(ncluster_max):
             #Feeding previous decoder output as input
@@ -101,19 +110,19 @@ def greedy_func(model,src,vocab_charges, ncluster_max: int, special_symbols: dic
             n_new_eos = torch.count_nonzero(new_eos_tokens_batch)
             if  n_new_eos> 0:
                 is_done[is_done_prev == False] = new_eos_tokens_batch[is_done_prev == False]
-                next_DOF_cont_batch_spe[new_eos_tokens_batch.squeeze(-1)] = torch.cat(( next_DOF_cont_batch[new_eos_tokens_batch.squeeze(-1)], 
-                                                                                        torch.tensor(special_symbols["eos"]["cont"], device = DEVICE).repeat(n_new_eos,1) ), 
+                next_DOF_cont_batch_spe[new_eos_tokens_batch] = torch.cat(( next_DOF_cont_batch[new_eos_tokens_batch], 
+                                                                                        eos_cont_tensor.repeat(n_new_eos,1) ), 
                                                                                       dim = -1)
-                #shouldn't be predicted but just in case
+            #shouldn't be predicted but just in case
             n_new_bos = torch.count_nonzero(new_bos_tokens_batch)
             if  n_new_bos > 0:
-                next_DOF_cont_batch_spe[new_bos_tokens_batch.squeeze(-1)] = torch.cat(( next_DOF_cont_batch[new_bos_tokens_batch.squeeze(-1)], 
-                                                                                        torch.tensor(special_symbols["bos"]["cont"], device = DEVICE).repeat(n_new_bos,1) ), 
+                next_DOF_cont_batch_spe[new_bos_tokens_batch] = torch.cat(( next_DOF_cont_batch[new_bos_tokens_batch], 
+                                                                                        bos_cont_tensor.repeat(n_new_bos,1) ), 
                                                                                         dim = -1)
             n_new_samples = torch.count_nonzero(new_sample_tokens_batch)
             if  n_new_samples > 0:
-                next_DOF_cont_batch_spe[new_sample_tokens_batch.squeeze(-1)] = torch.cat(( next_DOF_cont_batch[new_sample_tokens_batch.squeeze(-1)],
-                                                                                           torch.tensor(special_symbols["sample"], device = DEVICE).repeat(n_new_samples,1)),
+                next_DOF_cont_batch_spe[new_sample_tokens_batch] = torch.cat(( next_DOF_cont_batch[new_sample_tokens_batch],
+                                                                                           sample_cont_tensor.repeat(n_new_samples,1)),
                                                                                            dim = -1)
 
         
@@ -122,18 +131,17 @@ def greedy_func(model,src,vocab_charges, ncluster_max: int, special_symbols: dic
                                              next_DOF_cont_batch_spe), dim = -1) 
             #Need to change the next cluster of every event which was done previously to a pad
             #if torch.all(~is_done_prev):
-            next_charges_batch[is_done_prev] = vocab_charges.get_index(special_symbols["pad"]["CEL"])
+            next_clusters_batch[is_done_prev] = pad
             #Updating the tgt_padding_mask
-            tgt_key_padding_mask = torch.hstack([tgt_key_padding_mask, is_done_prev])
+            tgt_key_padding_mask = torch.hstack([tgt_key_padding_mask, is_done_prev.unsqueeze(-1)])
             
             clusters_transfo = torch.concat([clusters_transfo, next_clusters_batch.unsqueeze(1)], dim = 1)
             is_done_prev = torch.clone(is_done)
-            print(f"Memory allocated: {torch.cuda.memory_allocated(device = DEVICE)}")
+            #print(f"Memory allocated: {torch.cuda.memory_allocated(device = DEVICE)}")
             
             if torch.all(is_done):
-                clusters_transfo = add_pad(clusters_transfo, pad, ncluster_max)
                 break
-
+    clusters_transfo = add_pad_final(clusters_transfo, pad, ncluster_max)
     return clusters_transfo
 
 def inference(config):
@@ -174,19 +182,17 @@ def inference(config):
     model.eval()
     logging.info(f"Model created on {model.device}, now loading the source")
     
-    special_symbols, E_label_RMS_normalizer, src_loader = get_data((config["dir_path_inference"], ), config["batch_size"], config["frac_files"], "inference")
-    print(special_symbols)
+    special_symbols, E_label_RMS_normalizer, src_loader = get_data((config["dir_path_inference"], ), config["batch_size_test"], config["frac_files_test"], "inference")
     pred = []
     labels = []
     logging.info("Going to inference now")
     for src, tgt in src_loader:
         start_time = time()
         clusters_out = greedy_func(model, src,vocab_charges,config["ncluster_max"],special_symbols,config["d_input_decoder"] -2, dtype).to("cpu")
-        print(clusters_out.device)
-        clusters_out[...,0] = vocab_charges.indices_to_tokens(clusters_out[...,0])
-        clusters_out[...,1] = vocab_pdgs.indices_to_tokens(clusters_out[...,1]) 
-        clusters_out[...,2] = E_label_RMS_normalizer.inverse_normalize(clusters_out[...,2])
+        #print(clusters_out.device)
+        translate(clusters_out, vocab_charges, vocab_pdgs,E_label_RMS_normalizer)
         pred.append(clusters_out)
+        translate(tgt, vocab_charges, vocab_pdgs, E_label_RMS_normalizer)
         labels.append(tgt)
         delta_t = time() - start_time
         logging.info(f"Batch done in {delta_t} seconds")
@@ -258,25 +264,6 @@ def train_epoch(model, optim, train_dl, special_symbols,vocab_charges, vocab_pdg
         loss_epoch_cont += loss_cont.item()
         size_batch = len(train_dl)
 
-        #print(f"src device: {src.device}")
-        #print(f"tgt device: {tgt.device}")
-        #print(f"src_padding_mask device: {src_padding_mask.device}")
-        #print(f"tgt_padding_mask device: {tgt_padding_mask.device}")
-        #print(f"tgt_in_padding_mask device: {tgt_in_padding_mask.device}")
-        #print(f"tgt_out_padding_mask device: {tgt_out_padding_mask.device}")
-        #print(f"tgt_out device: {tgt_out.device}")
-        #print(f"tgt_out_charges device: {tgt_out_charges.device}")
-        #print(f"tgt_out_pdg device: {tgt_out_pdg.device}")
-        #print(f"tgt_out_cont device: {tgt_out_cont.device}")
-        #print(f"logits_charges device: {logits_charges.device}")
-        #print(f"logits_pdg device: {logits_pdg.device}")
-        #print(f"logits_cont device: {logits_cont.device}")
-        #print(f"logits_cont_sin_theta device: {logits_cont_sin_theta.device}")
-        #print(f"logits_cont_nx device: {logits_cont_nx.device}")
-        #print(f"logits_cont_ny device: {logits_cont_ny.device}")
-        #print(f"logits_cont device: {logits_cont.device}")
-        #print(f"eos_bos_mask device: {eos_bos_mask.device}")
-        #print(f"spe_tokens_mask device: {spe_tokens_mask.device}")
         if (i + 1) % period == 0:
             #logging.info(f"recording the losses, training, minibatch = {i + 1}")
             #print(nlog_epoch)
