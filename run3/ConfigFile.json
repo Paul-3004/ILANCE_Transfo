@@ -1,5 +1,5 @@
 {
-    "inference": false,
+    "inference": true,
     "dir_results": "./run3/",
     "dir_model": "./run3/",
     "dir_path_inference": "/data/suehara/mldata/pfa/ntau_10to100GeV_10/test",
