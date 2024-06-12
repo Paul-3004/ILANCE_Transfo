@@ -25,5 +25,5 @@
     "d_input_decoder": 8,
     "output_DOF_continuous": 3,
     "dtype": "torch.float32",
-    "ncluster_max": 100
+    "ncluster_max": 150
 }
