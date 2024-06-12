@@ -102,7 +102,7 @@ def greedy_func(model,src,vocab_charges, ncluster_max: int, special_symbols: dic
         #tgt_key_padding_mask = torch.zeros(batch_size,1).type(torch.bool).to(DEVICE)
         is_done = torch.zeros(batch_size,1).type(torch.bool).to(DEVICE) #to keep track of which event has eos token
         is_done_prev = torch.clone(is_done) #to keep track of previous status of eos tokens
-        for _ in range(ncluster_max):
+        for _ in range(ncluster_max-1):
             #Feeding previous decoder output as input
             out_decoder = model.decode(clusters_transfo, memory, tgt_key_padding_mask, src_padding_mask)
             #Computing the logits, only considering the last row. 
