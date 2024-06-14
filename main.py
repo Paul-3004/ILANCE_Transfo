@@ -35,7 +35,7 @@ def add_pad_final(input, pad_tokens, size):
 def translate(input, vocab_charges, vocab_pdgs, rms_normalizer):
     input[...,0] = vocab_charges.indices_to_tokens(input[...,0])
     input[...,1] = vocab_pdgs.indices_to_tokens(input[...,1])
-    input[...,2] = rms_normalizer.inverse_normalize(input[...,2])
+    input[...,2] = torch.pow(10,rms_normalizer.inverse_normalize(input[...,2]))
 
 '''
 Transforms a 3D unit vector encoded by theta and phi to a 3D vector in cartesian coordinates.
@@ -197,9 +197,11 @@ def inference(config):
     logging.info(f"Model created on {model.device}, now loading the source")
     
     special_symbols, E_label_RMS_normalizer, src_loader = get_data((config["dir_path_inference"], ), config["batch_size_test"], config["frac_files_test"], "inference")
+    logging.info("Saving normalizer...")
+    torch.save(E_label_RMS_normalizer, config["dir_results"] + "E_RMS_normalizer.pt")
+    logging.info("Going to inference now")
     pred = []
     labels = []
-    logging.info("Going to inference now")
     for src, tgt in src_loader:
         start_time = time()
         clusters_out = greedy_func(model, src,vocab_charges,config["ncluster_max"],special_symbols,config["d_input_decoder"] -2, dtype).to("cpu")
@@ -505,9 +507,11 @@ if __name__ == "__main__":
     parser = ArgumentParser(prog= "Finding clusters training and inference ")
     #Inference
     parser.add_argument("--inference", action= "store_true", help = "Set true to run inference")
-    parser.add_argument("--config_path", type = str, help = "Directory of ConfigFile")
+    parser.add_argument("-config_path", type = str, help = "Directory of ConfigFile")
+    parser.add_argument("-device", type = int, help = "Number of cuda device to use")
 
     args = parser.parse_args()
+    DEVICE = torch.device(f'cuda:{args.device}' if torch.cuda.is_available() else 'cpu')
 
     with open(args.config_path + "ConfigFile.json") as f:
         config = json.load(f)

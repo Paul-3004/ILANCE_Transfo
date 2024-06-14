@@ -1,0 +1,522 @@
+INFO:root:Getting the training data from/data/suehara/mldata/pfa/ntau_10to100GeV_10/train
+INFO:root:Loaded the data and saved vocabularies
+INFO:root:Created model, now training
+INFO:root:Getting the training data from/data/suehara/mldata/pfa/ntau_10to100GeV_10/train
+INFO:root:Loaded the data and saved vocabularies
+INFO:root:Created model, now training
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:Getting the training data from/data/suehara/mldata/pfa/ntau_10to100GeV_10/train
+INFO:root:Loaded the data and saved vocabularies
+INFO:root:Created model, now training
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:Getting the training data from/data/suehara/mldata/pfa/ntau_10to100GeV_10/train
+INFO:root:Loaded the data and saved vocabularies
+INFO:root:Created model, now training
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:Getting the training data from/data/suehara/mldata/pfa/ntau_10to100GeV_10/train
+INFO:root:Loaded the data and saved vocabularies
+INFO:root:Created model, now training
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:New best Model, saving...
+INFO:root:1 epoch done, time: 57.25822043418884, val_loss: 3.2264753580093384, train_loss: 4.349782490730286
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:New best Model, saving...
+INFO:root:2 epoch done, time: 57.040343046188354, val_loss: 3.1150110244750975, train_loss: 3.1678005933761595
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:New best Model, saving...
+INFO:root:3 epoch done, time: 57.31358480453491, val_loss: 3.0879242420196533, train_loss: 3.110932636260986
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:New best Model, saving...
+INFO:root:4 epoch done, time: 57.438066244125366, val_loss: 3.0998921155929566, train_loss: 3.0935009479522706
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:New best Model, saving...
+INFO:root:5 epoch done, time: 57.49806022644043, val_loss: 3.094832181930542, train_loss: 3.0879184007644653
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:New best Model, saving...
+INFO:root:6 epoch done, time: 57.518232583999634, val_loss: 3.094655179977417, train_loss: 3.0875697135925293
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:New best Model, saving...
+INFO:root:7 epoch done, time: 57.54408812522888, val_loss: 3.091131854057312, train_loss: 3.0854665517807005
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:New best Model, saving...
+INFO:root:8 epoch done, time: 57.67127060890198, val_loss: 3.0871063470840454, train_loss: 3.0882890939712526
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:New best Model, saving...
+INFO:root:9 epoch done, time: 57.64940071105957, val_loss: 3.0851161003112795, train_loss: 3.0842111110687256
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:New best Model, saving...
+INFO:root:10 epoch done, time: 57.67522573471069, val_loss: 3.0825355291366576, train_loss: 3.082324814796448
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:New best Model, saving...
+INFO:root:11 epoch done, time: 57.682140588760376, val_loss: 3.0837092876434324, train_loss: 3.0807961940765383
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:New best Model, saving...
+INFO:root:12 epoch done, time: 57.67566967010498, val_loss: 3.082019805908203, train_loss: 3.0853360414505007
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:New best Model, saving...
+INFO:root:13 epoch done, time: 57.691713094711304, val_loss: 3.0812727928161623, train_loss: 3.084945893287659
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:New best Model, saving...
+INFO:root:14 epoch done, time: 57.66447138786316, val_loss: 3.080219841003418, train_loss: 3.0778970956802367
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:New best Model, saving...
+INFO:root:15 epoch done, time: 57.66105794906616, val_loss: 3.080199193954468, train_loss: 3.0810220003128053
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:New best Model, saving...
+INFO:root:16 epoch done, time: 57.675182819366455, val_loss: 3.0813056230545044, train_loss: 3.082611894607544
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:New best Model, saving...
+INFO:root:17 epoch done, time: 57.66970348358154, val_loss: 3.082127022743225, train_loss: 3.077510452270508
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:New best Model, saving...
+INFO:root:18 epoch done, time: 57.67011904716492, val_loss: 3.0827716112136843, train_loss: 3.079432153701782
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:New best Model, saving...
+INFO:root:19 epoch done, time: 57.67123246192932, val_loss: 3.08270845413208, train_loss: 3.0780022382736205
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:training: batch done
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:validation: batch done
+INFO:root:New best Model, saving...
+INFO:root:20 epoch done, time: 57.652257442474365, val_loss: 3.084436225891113, train_loss: 3.075206089019775
+INFO:root:Finished all epochs and saved the losses
+INFO:root:Getting the training data from/data/suehara/mldata/pfa/ntau_10to100GeV_10/train

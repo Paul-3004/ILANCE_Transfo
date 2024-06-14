@@ -77,4 +77,46 @@ def load_awkwards(filenames):
 
     return ak_feats, ak_labels
 
+def save_awkward(filename, ak_feat, ak_label, ak_pred = None, ak_energy = None, ak_x = None, ak_y = None):
+    file = h5py.File(filename,"w")
+    g_feat = file.create_group("feature")
+
+    form, length, container = ak.to_buffers(ak_feat, container=g_feat)
+    g_feat.attrs["form"] = form.to_json()
+    g_feat.attrs["length"] = json.dumps(length)
+
+    g_label = file.create_group("label")
+
+    form, length, container = ak.to_buffers(ak_label, container=g_label)
+    g_label.attrs["form"] = form.to_json()
+    g_label.attrs["length"] = json.dumps(length)
+
+    if ak_pred is not None:
+        g_pred = file.create_group("pred")
+
+        form, length, container = ak.to_buffers(ak_pred, container=g_pred)
+        g_pred.attrs["form"] = form.to_json()
+        g_pred.attrs["length"] = json.dumps(length)
+
+    if ak_energy is not None:
+        g_energy = file.create_group("energy")
+
+        form, length, container = ak.to_buffers(ak_energy, container=g_energy)
+        g_energy.attrs["form"] = form.to_json()
+        g_energy.attrs["length"] = json.dumps(length)
+
+    if ak_x is not None:
+        g_x = file.create_group("x")
+
+        form, length, container = ak.to_buffers(ak_x, container=g_x)
+        g_x.attrs["form"] = form.to_json()
+        g_x.attrs["length"] = json.dumps(length)
+
+    if ak_y is not None:
+        g_y = file.create_group("y")
+
+        form, length, container = ak.to_buffers(ak_y, container=g_y)
+        g_y.attrs["form"] = form.to_json()
+        g_y.attrs["length"] = json.dumps(length)
+
     

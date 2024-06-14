@@ -1,0 +1,39 @@
+INFO:root:Getting the training data from/data/suehara/mldata/pfa/ntau_10to100GeV_10/train
+INFO:root:Loaded the data and saved vocabularies
+INFO:root:Created model, computing logging frequencies...
+INFO:root:Logging frequencies computed, nlog_epoch modified as: 10 to 10. Number of losses that will be recorded is thus: 100 for the training set and 100
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:New best Model, saving...
+INFO:root:1 epoch done, time: 667.5440273284912, val_loss: 0.778732682466507, train_loss: 0.8134990741312503
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:New best Model, saving...
+INFO:root:2 epoch done, time: 663.0313220024109, val_loss: 0.7662509825825691, train_loss: 0.7790356112271547
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:New best Model, saving...
+INFO:root:3 epoch done, time: 662.6381919384003, val_loss: 0.7564673510193825, train_loss: 0.7681729602441192
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:New best Model, saving...
+INFO:root:4 epoch done, time: 665.1419179439545, val_loss: 0.7486937332153321, train_loss: 0.7598830167576671
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:New best Model, saving...
+INFO:root:5 epoch done, time: 663.6573398113251, val_loss: 0.7421585074067116, train_loss: 0.7534546528756618
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:New best Model, saving...
+INFO:root:6 epoch done, time: 662.7264196872711, val_loss: 0.7321086609363556, train_loss: 0.7464252649992704
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:New best Model, saving...
+INFO:root:7 epoch done, time: 662.7274582386017, val_loss: 0.7287740585207939, train_loss: 0.7407416186854243
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:New best Model, saving...
+INFO:root:8 epoch done, time: 662.6699297428131, val_loss: 0.7231172263622284, train_loss: 0.7360648687183857
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:New best Model, saving...
+INFO:root:9 epoch done, time: 663.0273551940918, val_loss: 0.72223278850317, train_loss: 0.7325012340769171
+INFO:root:Finished training for one epoch, going to valiation
+INFO:root:New best Model, saving...
+INFO:root:10 epoch done, time: 662.6950588226318, val_loss: 0.7197739481925964, train_loss: 0.7297212209179997
+INFO:root:Finished all epochs and saved the losses
+INFO:root:Getting the training data from/data/suehara/mldata/pfa/ntau_10to100GeV_10/train
+INFO:root:Loaded the data and saved vocabularies
+INFO:root:Created model, computing logging frequencies...
+INFO:root:Logging frequencies computed, nlog_epoch modified as: 10 to 10. Number of losses that will be recorded is thus: 100 for the training set and 100
