@@ -1,5 +1,6 @@
-*/best_model.pt
+Results/*/best_model.pt
 */best_model1.pt
 testing.ipynb
 Analysis
-*/Graphs
+Results/*/Graphs
+Comparisons

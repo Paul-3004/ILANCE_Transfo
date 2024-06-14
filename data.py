@@ -116,7 +116,7 @@ class RMSNormalizer:
                 - P: number of hits + tracks per event (variable size)
                 - F: number of features = 10 (edep, x, y, z, time, track, charge, px, py, pz) in this order
                     if track is 0: hit in calorimeter, no info on momentum and charge (all set to 0)
-                             is 1: x,y,z is pos of entry in calorimeter, px,py,pz, momentum from trajectory
+                             is 1: x,y,z is pos of entry in calorimeter, px,py,pz, momentum from trajectory, E is set to 0
             labels: 3D awkward array of size (N,P,F), where
                 - N: number of events (50/file)
                 - P: number of hits + tracks per event (variable size)
@@ -202,7 +202,7 @@ class CollectionHitsTraining(Dataset):
         #Computing labels energy + total momentum
         pvec = labels[...,-3:]
         pvec_norm2 = ak.sum(np.square(pvec), axis = -1) 
-        E_label = np.log10(np.sqrt(np.square(labels[...,1]) + pvec_norm2)) # E = sqrt{m^2 + p^2}
+        E_label = np.log10(np.sqrt(np.square(labels[...,2]) + pvec_norm2)) # E = sqrt{m^2 + p^2}
         indices_sort_E = ak.argsort(E_label, axis = -1, ascending= False)
         E_label = self.RMS_normalize(E_label, "E_label")
         cluster_direction = pvec / np.sqrt(pvec_norm2) #normalising momentum
