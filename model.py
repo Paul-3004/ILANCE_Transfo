@@ -2,7 +2,7 @@ from collections import OrderedDict
 import torch
 import torch.nn as nn
 from torch.nn.functional import softmax
-from torch.nn.modules.transformer import _get_clones
+from torch.nn.modules.transformer import _get_clones, TransformerEncoderLayer, TransformerEncoder, TransformerDecoderLayer, TransformerDecoder
 
 
 class Embedder(nn.Module):
@@ -57,7 +57,7 @@ class CustomDecoder(nn.Module):
         self.nlayers = nlayers
         self.layers = _get_clones(layer, nlayers)
     
-    def forward(self,tgt, memory,tgt_mask, tgt_key_padding_mask, memory_key_padding_mask, tgt_is_causal):
+    def forward(self,tgt, memory,tgt_mask, tgt_key_padding_mask, memory_key_padding_mask, tgt_is_causal, memory_is_causal = None, memory_mask = None):
         output = tgt
         for layer in self.layers:
             output = layer(output, memory, tgt_mask = tgt_mask,
@@ -67,36 +67,36 @@ class CustomDecoder(nn.Module):
         return output
 
 class CustomDecoderLayer(nn.Module):
-    def __init__(self,d_model, d_proj,nproj, nhead, dim_ff_sub, dim_ff_main, batch_first, dtype, device,activation = nn.ReLU(), dropout = 0.1):
+    def __init__(self,d_label, d_proj,nproj, nhead, dim_ff_sub, dim_ff_main, batch_first, dtype, device,activation = nn.ReLU(), dropout = 0.1):
         super(CustomDecoderLayer, self).__init__()
         self.dtype = dtype
         self.device = device
         
-        dim_proj = d_model // nproj
-        assert nproj * dim_proj == d_model, "CustomDecoderLayer: d_model must be divisible by nproj"
+        dim_proj = d_label // nproj
+        assert nproj * dim_proj == d_label, "CustomDecoderLayer: d_model must be divisible by nproj"
         self.nproj = nproj
         self.dim_proj = dim_proj
         
-        projection = nn.Linear(d_model, d_proj,dtype = dtype, device = device, bias = False)
+        projection = nn.Linear(d_label, d_proj,dtype = dtype, device = device, bias = False)
         decoder_sublayer = nn.TransformerDecoderLayer(d_proj,nhead,dim_ff_sub,batch_first=batch_first, device = device, dtype = dtype)
 
         self.projections = _get_clones(projection, nproj)
         self.decoder_layers = _get_clones(decoder_sublayer,nproj)
 
         #main feed forward
-        self.linear1 = nn.Linear(d_model,dim_ff_main)
+        self.linear1 = nn.Linear(d_label,dim_ff_main)
         self.dropout_ff1 = nn.Dropout(dropout)
-        self.linear2 = nn.Linear(dim_ff_main,d_model)
+        self.linear2 = nn.Linear(dim_ff_main,d_label)
         self.dropout_ff2 = nn.Dropout(dropout)
         #Layer Normalization
-        self.norm1 = nn.LayerNorm(d_model,device= device, dtype = dtype)
-        self.norm2 = nn.LayerNorm(d_model,device= device, dtype = dtype)
+        self.norm1 = nn.LayerNorm(d_label,device= device, dtype = dtype)
+        self.norm2 = nn.LayerNorm(d_label,device= device, dtype = dtype)
 
 
 
     def forward(self, tgt, memory, tgt_mask, tgt_key_padding_mask, memory_key_padding_mask, tgt_is_causal):
         assert self.dim_proj == memory.shape[-1], "CustomDecoderLayer: Dimension of decoder input after projection and encoder output must match."
-        size_proj = tgt.shape
+        size_proj = list(tgt.shape)
         size_proj[-1] = self.dim_proj
         output = torch.zeros(self.nproj, *size_proj, dtype =  self.dtype, device = self.device)
         for i in range(self.nproj):
@@ -114,8 +114,66 @@ class CustomDecoderLayer(nn.Module):
         x = self.linear2(self.dropout_ff1(self.linear1(x)))
         return self.dropout_ff2(x)
 
+class CustomTransformer(nn.Module):
+    def __init__(self,d_model: int = 512, nhead: int = 8, num_encoder_layers: int = 6,
+                 num_decoder_layers: int = 6, dim_feedforward: int = 2048, dropout: float = 0.1,
+                 activation =nn.ReLU(),
+                 custom_encoder = None, custom_decoder  = None,
+                 layer_norm_eps: float = 1e-5, batch_first: bool = False, norm_first: bool = False,
+                 bias: bool = True, device=None, dtype=None) -> None:
+        factory_kwargs = {'device': device, 'dtype': dtype}
+        super().__init__()
+        torch._C._log_api_usage_once(f"torch.nn.modules.{self.__class__.__name__}")
 
+        if custom_encoder is not None:
+            self.encoder = custom_encoder
+        else:
+            encoder_layer = TransformerEncoderLayer(d_model, nhead, dim_feedforward, dropout,
+                                                    activation, layer_norm_eps, batch_first, norm_first,
+                                                    bias, **factory_kwargs)
+            encoder_norm = nn.LayerNorm(d_model, eps=layer_norm_eps, bias=bias, **factory_kwargs)
+        self.encoder = TransformerEncoder(encoder_layer, num_encoder_layers, encoder_norm)
+                                                                                
+        if custom_decoder is not None:
+            self.decoder = custom_decoder
+        else:
+            decoder_layer = TransformerDecoderLayer(d_model, nhead, dim_feedforward, dropout,
+                                                    activation, layer_norm_eps, batch_first, norm_first,
+                                                    bias, **factory_kwargs)
+            decoder_norm = nn.LayerNorm(d_model, eps=layer_norm_eps, bias=bias, **factory_kwargs)
+            self.decoder = TransformerDecoder(decoder_layer, num_decoder_layers, decoder_norm)
 
+        self._reset_parameters()
+
+        self.d_model = d_model
+        self.nhead = nhead
+
+        self.batch_first = batch_first
+    
+    def forward(self, src, tgt, src_mask = None, tgt_mask = None,
+                                memory_mask = None, src_key_padding_mask = None,
+                                tgt_key_padding_mask = None, memory_key_padding_mask = None,
+                                src_is_causal  = None, tgt_is_causal = None,
+                                memory_is_causal: bool = False):
+        is_batched = src.dim() == 3
+        if not self.batch_first and src.size(1) != tgt.size(1) and is_batched:
+            raise RuntimeError("the batch number of src and tgt must be equal")
+        elif self.batch_first and src.size(0) != tgt.size(0) and is_batched:
+            raise RuntimeError("the batch number of src and tgt must be equal")
+        
+        memory = self.encoder(src, mask=src_mask, src_key_padding_mask=src_key_padding_mask,
+                              is_causal=src_is_causal)
+        output = self.decoder(tgt, memory, tgt_mask=tgt_mask, memory_mask=memory_mask,
+                              tgt_key_padding_mask=tgt_key_padding_mask,
+                              memory_key_padding_mask=memory_key_padding_mask,
+                              tgt_is_causal=tgt_is_causal, memory_is_causal=memory_is_causal)
+        return output
+
+    def _reset_parameters(self):
+        r"""Initiate parameters in the transformer model."""
+        for p in self.parameters():
+            if p.dim() > 1:
+                nn.init.xavier_uniform_(p)
 # Implements a neural network composed of an Embedder converting d_input hits to d_model vectors, 
 #           then feeding it as input to transformer and produces the output 
 # parameters:
@@ -148,9 +206,9 @@ class ClustersFinder(nn.Module):
         super(ClustersFinder,self).__init__()
         self.device = device
         self.dtype = dtype
-        self.input_embedder = Embedder(nlayers = nlayers_embedder_src, d_input=d_input_encoder,d_model=dmodel,d_hid = d_ff_embedder_src, dtype = dtype)
-        self.tgt_embedder = Embedder(nlayers = nlayers_embedder_tgt, d_input=d_input_decoder,d_model=dmodel, d_hid = d_ff_embedder_tgt, dtype = dtype)
-        self.transformer = nn.Transformer(d_model=dmodel, 
+        self.input_embedder = Embedder(nlayers = nlayers_embedder_src, d_input=d_input_encoder,d_model=d_out_embedder_src,d_hid = d_ff_embedder_src, dtype = dtype)
+        self.tgt_embedder = Embedder(nlayers = nlayers_embedder_tgt, d_input=d_input_decoder,d_model=d_out_embedder_tgt, d_hid = d_ff_embedder_tgt, dtype = dtype)
+        self.transformer = CustomTransformer(d_model=dmodel, 
                                           nhead = nhead, 
                                           dim_feedforward= d_ff_trsf,
                                           num_encoder_layers=nlayers_encoder, 
@@ -160,9 +218,9 @@ class ClustersFinder(nn.Module):
                                           dtype = dtype,
                                           device = device)
 
-        self.lastlin_charge = nn.Linear(dmodel,ncharges_max, dtype= dtype)
-        self.lastlin_pdg = nn.Linear(dmodel,nparticles_max, dtype = dtype)
-        self.lastlin_cont = nn.Linear(dmodel,DOF_continous, dtype= dtype)
+        self.lastlin_charge = nn.Linear(d_out_embedder_tgt,ncharges_max, dtype= dtype)
+        self.lastlin_pdg = nn.Linear(d_out_embedder_tgt,nparticles_max, dtype = dtype)
+        self.lastlin_cont = nn.Linear(d_out_embedder_tgt,DOF_continous, dtype= dtype)
 
     '''forward will be called when the __call__ function of nn.Module will be called., used for training
         args:
