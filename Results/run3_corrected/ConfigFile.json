@@ -1,7 +1,7 @@
 {
     "inference": true,
     "dir_results": "./Results/run3_corrected/",
-    "dir_model": ".Results/run3_corrected/",
+    "dir_model": "./Results/run3_corrected/",
     "dir_path_inference": "/data/suehara/mldata/pfa/ntau_10to100GeV_10/test",
     "path_charges": "./Results/run3_corrected/",
     "path_PDGs": "./Results/run3_corrected/",
