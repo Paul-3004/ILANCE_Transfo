@@ -295,7 +295,7 @@ def train_epoch(model, optim, train_dl, special_symbols,vocab_charges, vocab_pdg
         #Computing the losses
         loss_charges = loss_fn_charges(logits_charges.transpose(dim0 = -2, dim1 = -1), tgt_out_charges)
         loss_pdg = loss_fn_pdg(logits_pdg.transpose(dim0 = -2, dim1 = -1), tgt_out_pdg)
-        loss_cont_vec = loss_fn_cont(translate_E(logits_cont, E_rms_normalizer), translate_E(tgt_out_cont, E_rms_normalizer))
+        loss_cont_vec = loss_fn_cont(logits_cont, tgt_out_cont)
         #nspe_tokens = torch.count_nonzero(spe_tokens_mask, dim = -1)
         #n_nospe = spe_tokens_mask.shape[-1] - nspe_tokens
         loss_cont = torch.mean(loss_cont_vec[~spe_tokens_mask])
@@ -368,7 +368,7 @@ def validate_epoch(model, val_dl, special_symbols,vocab_charges, vocab_pdgs, E_r
             #Computing the losses
             loss_charges = loss_fn_charges(logits_charges.transpose(dim0 = -2, dim1 = -1), tgt_out_charges)
             loss_pdg = loss_fn_pdg(logits_pdg.transpose(dim0 = -2, dim1 = -1), tgt_out_pdg)
-            loss_cont_vec = loss_fn_cont(translate_E(logits_cont, E_rms_normalizer), translate_E(tgt_out_cont, E_rms_normalizer))
+            loss_cont_vec = loss_fn_cont(logits_cont, tgt_out_cont)
             #nspe_tokens = torch.count_nonzero(spe_tokens_mask, dim = -1)
             #n_nospe = spe_tokens_mask.shape[-1] - nspe_tokens
             loss_cont = torch.mean(loss_cont_vec[~spe_tokens_mask])
