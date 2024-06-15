@@ -28,12 +28,11 @@ def add_pad_final(input, pad_tokens, size):
     diff_size = size - nhits_input
     if diff_size > 0:
         pad = pad_tokens.repeat(input.shape[0], diff_size,1)
-        print(pad)
         input = torch.cat([input, pad], dim = 1)
     return input
 
 def translate_E(logits_cont, rms_normalizer):
-    if logits_cont.shape[-1] == 1:
+    if logits_cont.dim() < 3:
         E = logits_cont
     else:
         E = logits_cont[...,0]
@@ -52,7 +51,7 @@ def create_model(config, version, vcharges_size, vpdgs_size):
     if version == 1:
         decoder = None
     elif version == 2:
-        decoder_layer = CustomDecoderLayer(d_model = config["dmodel"], 
+        decoder_layer = CustomDecoderLayer(d_label = config["d_out_embedder_tgt"], 
                                            d_proj = config["d_out_embedder_src"],
                                            nproj = config["nproj"],
                                            nhead = config["nhead"],
@@ -221,7 +220,7 @@ def inference(config, args):
     logging.info("Loading the vocabularies...")
     vocab_charges = Vocab.from_dict(torch.load(config["path_charges"] + "vocab_charges.pt"))
     vocab_pdgs = Vocab.from_dict(torch.load(config["path_PDGs"] + "vocab_PDGs.pt"))
-    model = create_model(config, args.version, len(vocab_charges), len(vocab_pdgs))
+    model = create_model(config, args.model, len(vocab_charges), len(vocab_pdgs))
 
     #Loading weights
     model.load_state_dict(torch.load(config["dir_model"] + "best_model.pt"))
@@ -325,6 +324,7 @@ def train_epoch(model, optim, train_dl, special_symbols,vocab_charges, vocab_pdg
             loss_epoch_pdgs = 0.
             loss_epoch_cont = 0.
             count_log += 1
+        #print(f"Memory allocated end of batch: {torch.cuda.memory_allocated(DEVICE) / 1e9} GB")
         #return (loss_epoch / size_batch, loss_epoch_charges / size_batch, loss_epoch_pdgs / size_batch, loss_epoch_cont / size_batch)
     return loss_epoch_tot / size_batch
 
@@ -415,8 +415,8 @@ def train_and_validate(config, args):
     logging.info("Loaded the data and saved vocabularies")
 
     print(f"memory on CUDA, model not yet created: {torch.cuda.memory_allocated(DEVICE)}")
-    model = create_model(config, args.version,len(vocab_charges), len(vocab_pdgs))
-    print(f"Created model on CUDA {model.device}, memory allocated: {torch.cuda.memory_allocated(DEVICE)}")
+    model = create_model(config, args.model,len(vocab_charges), len(vocab_pdgs))
+    print(f"Created model on CUDA {model.device}, memory allocated: {torch.cuda.memory_allocated(DEVICE) / 1e9} GB")
     nparams = sum(param.numel() for param in model.parameters())
     print(f"number of parameters: {nparams}")
     logging.info("Created model, computing logging frequencies...")
