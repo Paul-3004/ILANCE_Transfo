@@ -8,7 +8,7 @@ import numpy as np
 from math import ceil
 
 from data import create_mask, get_data, Vocab
-from model import ClustersFinder
+from model import ClustersFinder, CustomDecoderLayer, CustomDecoder
 from argparse import ArgumentParser
 import json
 import logging
@@ -32,10 +32,60 @@ def add_pad_final(input, pad_tokens, size):
         input = torch.cat([input, pad], dim = 1)
     return input
 
+def translate_E(logits_cont, rms_normalizer):
+    if logits_cont.shape[-1] == 1:
+        E = logits_cont
+    else:
+        E = logits_cont[...,0]
+    return torch.pow(10,rms_normalizer.inverse_normalize(E))
+
 def translate(input, vocab_charges, vocab_pdgs, rms_normalizer):
     input[...,0] = vocab_charges.indices_to_tokens(input[...,0])
     input[...,1] = vocab_pdgs.indices_to_tokens(input[...,1])
-    input[...,2] = torch.pow(10,rms_normalizer.inverse_normalize(input[...,2]))
+    input[...,2] = translate_E(input[...,2], rms_normalizer)
+
+def create_model(config, version, vcharges_size, vpdgs_size):
+    if config["dtype"] == "torch.float32":
+        dtype = torch.float32
+    
+    version = args.model
+    if version == 1:
+        decoder = None
+    elif version == 2:
+        decoder_layer = CustomDecoderLayer(d_model = config["dmodel"], 
+                                           d_proj = config["d_out_embedder_src"],
+                                           nproj = config["nproj"],
+                                           nhead = config["nhead"],
+                                           dim_ff_sub = config["dim_ff_sub_decoder"],
+                                           dim_ff_main = config["dim_ff_main_decoder"],
+                                           batch_first= True,
+                                           dtype = dtype,
+                                           device = DEVICE)
+        decoder = CustomDecoder(decoder_layer, config["nlayers_decoder"])
+
+    #Creating model
+    model = ClustersFinder(
+        dmodel = config["dmodel"],
+        nhead = config["nhead"],
+        d_ff_trsf = config["nhid_ff_trsf"],
+        custom_decoder= decoder,
+        nlayers_encoder= config["nlayers_encoder"],
+        nlayers_decoder= config["nlayers_decoder"],
+        nlayers_embedder_src = config["nlayers_embedder_src"],
+        d_ff_embedder_src = config["d_ff_embedder_src"],
+        d_out_embedder_src= config["d_out_embedder_src"],
+        nlayers_embedder_tgt = config["nlayers_embedder_tgt"],
+        d_ff_embedder_tgt = config["d_ff_embedder_tgt"],
+        d_out_embedder_tgt= config["d_out_embedder_tgt"],
+        d_input_encoder = config["d_input_encoder"],
+        d_input_decoder = config["d_input_decoder"],
+        nparticles_max= vpdgs_size,
+        ncharges_max= vcharges_size,
+        DOF_continous= config["output_DOF_continuous"],
+        device = DEVICE,
+        dtype = dtype
+    ).to(DEVICE)
+    return model
 
 '''
 Transforms a 3D unit vector encoded by theta and phi to a 3D vector in cartesian coordinates.
@@ -158,7 +208,7 @@ def greedy_func(model,src,vocab_charges, ncluster_max: int, special_symbols: dic
     clusters_transfo = add_pad_final(clusters_transfo, pad, ncluster_max)
     return clusters_transfo
 
-def inference(config):
+def inference(config, args):
     logger = logging.getLogger(__name__)
     logging.basicConfig(filename= config["dir_results"] + "log_inference.txt", level= logging.INFO)
     file_handler = logging.FileHandler(logger.name, mode = 'w')
@@ -171,30 +221,16 @@ def inference(config):
     logging.info("Loading the vocabularies...")
     vocab_charges = Vocab.from_dict(torch.load(config["path_charges"] + "vocab_charges.pt"))
     vocab_pdgs = Vocab.from_dict(torch.load(config["path_PDGs"] + "vocab_PDGs.pt"))
+    model = create_model(config, args.version, len(vocab_charges), len(vocab_pdgs))
 
-    if config["dtype"] == "torch.float32":
-        dtype = torch.float32
-        
-    #Creating model
-    model = ClustersFinder(
-        dmodel = config["dmodel"],
-        nhead = config["nhead"],
-        nhid_ff_trsf = config["nhid_ff_trsf"],
-        nlayers_encoder= config["nlayers_encoder"],
-        nlayers_decoder= config["nlayers_decoder"],
-        nlayers_embder = config["nlayers_embder"],
-        d_input_encoder = config["d_input_encoder"],
-        d_input_decoder = config["d_input_decoder"],
-        nparticles_max= len(vocab_pdgs),
-        ncharges_max= len(vocab_charges),
-        DOF_continous= config["output_DOF_continuous"],
-        device = DEVICE,
-        dtype = dtype
-    ).to(DEVICE)
     #Loading weights
     model.load_state_dict(torch.load(config["dir_model"] + "best_model.pt"))
     model.eval()
     logging.info(f"Model created on {model.device}, now loading the source")
+
+    if config["dtype"] == "torch.float32":
+        dtype = torch.float32
+    
     
     special_symbols, E_label_RMS_normalizer, src_loader = get_data((config["dir_path_inference"], ), config["batch_size_test"], config["frac_files_test"], "inference")
     logging.info("Saving normalizer...")
@@ -222,7 +258,7 @@ def inference(config):
 
 #train the model for one epoch
 #src: input hits from simulation, tgt: MC truth clusters 
-def train_epoch(model, optim, train_dl, special_symbols,vocab_charges, vocab_pdgs, 
+def train_epoch(model, optim, train_dl, special_symbols,vocab_charges, vocab_pdgs, E_rms_normalizer,
                 hyperweights_lossfn, loss_fn_charges, loss_fn_pdg,loss_fn_cont,nlog_period_epoch, loss_evo, epoch):
     model.train() #setting model into train mode
 
@@ -260,7 +296,7 @@ def train_epoch(model, optim, train_dl, special_symbols,vocab_charges, vocab_pdg
         #Computing the losses
         loss_charges = loss_fn_charges(logits_charges.transpose(dim0 = -2, dim1 = -1), tgt_out_charges)
         loss_pdg = loss_fn_pdg(logits_pdg.transpose(dim0 = -2, dim1 = -1), tgt_out_pdg)
-        loss_cont_vec = loss_fn_cont(logits_cont, tgt_out_cont)
+        loss_cont_vec = loss_fn_cont(translate_E(logits_cont, E_rms_normalizer), translate_E(tgt_out_cont, E_rms_normalizer))
         #nspe_tokens = torch.count_nonzero(spe_tokens_mask, dim = -1)
         #n_nospe = spe_tokens_mask.shape[-1] - nspe_tokens
         loss_cont = torch.mean(loss_cont_vec[~spe_tokens_mask])
@@ -292,7 +328,7 @@ def train_epoch(model, optim, train_dl, special_symbols,vocab_charges, vocab_pdg
         #return (loss_epoch / size_batch, loss_epoch_charges / size_batch, loss_epoch_pdgs / size_batch, loss_epoch_cont / size_batch)
     return loss_epoch_tot / size_batch
 
-def validate_epoch(model, val_dl, special_symbols,vocab_charges, vocab_pdgs, 
+def validate_epoch(model, val_dl, special_symbols,vocab_charges, vocab_pdgs, E_rms_normalizer,
                    hyperweights_lossfn, loss_fn_charges, loss_fn_pdg,loss_fn_cont, nlog_period_epoch, loss_evo,epoch):  
     model.eval() #setting model into train mode
 
@@ -332,7 +368,7 @@ def validate_epoch(model, val_dl, special_symbols,vocab_charges, vocab_pdgs,
             #Computing the losses
             loss_charges = loss_fn_charges(logits_charges.transpose(dim0 = -2, dim1 = -1), tgt_out_charges)
             loss_pdg = loss_fn_pdg(logits_pdg.transpose(dim0 = -2, dim1 = -1), tgt_out_pdg)
-            loss_cont_vec = loss_fn_cont(logits_cont, tgt_out_cont)
+            loss_cont_vec = loss_fn_cont(translate_E(logits_cont, E_rms_normalizer), translate_E(tgt_out_cont, E_rms_normalizer))
             #nspe_tokens = torch.count_nonzero(spe_tokens_mask, dim = -1)
             #n_nospe = spe_tokens_mask.shape[-1] - nspe_tokens
             loss_cont = torch.mean(loss_cont_vec[~spe_tokens_mask])
@@ -360,7 +396,7 @@ def validate_epoch(model, val_dl, special_symbols,vocab_charges, vocab_pdgs,
     #return (loss_epoch / size_batch, loss_epoch_charges / size_batch, loss_epoch_pdgs / size_batch, loss_epoch_cont / size_batch)
     return loss_epoch_tot / size_batch
 
-def train_and_validate(config):
+def train_and_validate(config, args):
 
     logger = logging.getLogger(__name__)
     logging.basicConfig(filename= config["dir_results"] + "log.txt", level= logging.INFO)
@@ -372,39 +408,18 @@ def train_and_validate(config):
     logging.getLogger().addHandler(console)
 
     logging.info("Getting the training data from" +config["dir_path_train"])
-    vocab_charges, vocab_pdgs, special_symbols, _, train_dl, val_dl = get_data((config["dir_path_train"], config["dir_path_val"]), config["batch_size"], config["frac_files"], "training")
+    vocab_charges, vocab_pdgs, special_symbols, E_rms_normalizer, train_dl, val_dl = get_data((config["dir_path_train"], config["dir_path_val"]), config["batch_size"], config["frac_files"], "training")
     torch.save(vocab_charges.vocab, config["dir_results"] + "vocab_charges.pt")
     torch.save(vocab_pdgs.vocab, config["dir_results"] + "vocab_PDGs.pt")
     
     logging.info("Loaded the data and saved vocabularies")
 
     print(f"memory on CUDA, model not yet created: {torch.cuda.memory_allocated(DEVICE)}")
-    #Creating model
-    if config["dtype"] == "torch.float32":
-        dtype = torch.float32
-    model = ClustersFinder(
-        dmodel = config["dmodel"],
-        nhead = config["nhead"],
-        nhid_ff_trsf = config["nhid_ff_trsf"],
-        nlayers_encoder= config["nlayers_encoder"],
-        nlayers_decoder= config["nlayers_decoder"],
-        nlayers_embder = config["nlayers_embder"],
-        d_input_encoder = config["d_input_encoder"],
-        d_input_decoder = config["d_input_decoder"],
-        nparticles_max= len(vocab_pdgs),
-        ncharges_max= len(vocab_charges),
-        DOF_continous= config["output_DOF_continuous"],
-        device = DEVICE,
-        dtype = dtype
-    ).to(DEVICE)
-
-    print(f"memory on CUDA, model created: {torch.cuda.memory_allocated(DEVICE)}")
+    model = create_model(config, args.version,len(vocab_charges), len(vocab_pdgs))
+    print(f"Created model on CUDA {model.device}, memory allocated: {torch.cuda.memory_allocated(DEVICE)}")
     nparams = sum(param.numel() for param in model.parameters())
-    nparams_trainable = sum(param.numel() for param in model.parameters() if param.requires_grad)
     print(f"number of parameters: {nparams}")
-    print(f"number of parameters: {nparams_trainable}")
     logging.info("Created model, computing logging frequencies...")
-    print(f"DEVICE: {DEVICE}") 
     optim = torch.optim.Adam(model.parameters(), lr = config["lr"])
     loss_fn_charges = nn.CrossEntropyLoss(ignore_index=vocab_charges.get_index(special_symbols["pad"]["CEL"]), reduction ='mean')
     loss_fn_pdgs = nn.CrossEntropyLoss(ignore_index=vocab_pdgs.get_index(special_symbols["pad"]["CEL"]), reduction ='mean')
@@ -430,7 +445,7 @@ def train_and_validate(config):
                         "pdgs_val": np.zeros(nloss_val),
                         "cont_val": np.zeros(nloss_val)}
     logging.info(f"Logging frequencies computed, nlog_epoch modified as: {nlog_epoch} to {nlog_period_train['nlog']}. Number of losses that will be recorded is thus: {nloss_train} for the training set and {nloss_val}")
-    
+    logging.info("Starting training...")
     for i in range(nepoch):
         start_time = time()
         # train_loss_epoch, charges_train, pdgs_train, cont_train = train_epoch(model,
@@ -451,6 +466,7 @@ def train_and_validate(config):
                                        special_symbols = special_symbols,
                                        vocab_charges = vocab_charges,
                                        vocab_pdgs= vocab_pdgs,
+                                       E_rms_normalizer = E_rms_normalizer,
                                        loss_fn_charges = loss_fn_charges,
                                        loss_fn_pdg= loss_fn_pdgs,
                                        loss_fn_cont= loss_fn_cont,
@@ -475,6 +491,7 @@ def train_and_validate(config):
                                        special_symbols = special_symbols,
                                        vocab_charges = vocab_charges,
                                        vocab_pdgs= vocab_pdgs,
+                                       E_rms_normalizer = E_rms_normalizer,
                                        loss_fn_charges = loss_fn_charges,
                                        loss_fn_pdg= loss_fn_pdgs,
                                        loss_fn_cont= loss_fn_cont,
@@ -509,6 +526,7 @@ if __name__ == "__main__":
     parser.add_argument("--inference", action= "store_true", help = "Set true to run inference")
     parser.add_argument("-config_path", type = str, help = "Directory of ConfigFile")
     parser.add_argument("-device", type = int, help = "Number of cuda device to use")
+    parser.add_argument("-model", type = int, help = "Number of model implementation to use")
 
     args = parser.parse_args()
     DEVICE = torch.device(f'cuda:{args.device}' if torch.cuda.is_available() else 'cpu')
@@ -517,9 +535,9 @@ if __name__ == "__main__":
         config = json.load(f)
 
     if args.inference:
-        inference(config)
+        inference(config,args)
     else:
-        train_and_validate(config)
+        train_and_validate(config,args)
 
         
         
