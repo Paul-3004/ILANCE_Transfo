@@ -8,7 +8,7 @@
     "dir_path_train":  "/data/suehara/mldata/pfa/ntau_10to100GeV_10/train",
     "dir_path_val":  "/data/suehara/mldata/pfa/ntau_10to100GeV_10/validation",
     "epochs": 10,
-    "frac_files": 0.0025,
+    "frac_files": 0.02,
     "frac_files_test": 0.02,
     "nlog_epoch": 10,
     "lr": 1e-4,

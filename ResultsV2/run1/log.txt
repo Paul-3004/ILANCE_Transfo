@@ -1,42 +1,36 @@
 INFO:root:Getting the training data from/data/suehara/mldata/pfa/ntau_10to100GeV_10/train
-INFO:root:Getting the training data from/data/suehara/mldata/pfa/ntau_10to100GeV_10/train
 INFO:root:Loaded the data and saved vocabularies
 INFO:root:Created model, computing logging frequencies...
-INFO:root:Logging frequencies computed, nlog_epoch modified as: 10 to 10. Number of losses that will be recorded is thus: 100 for the training set and 120
-INFO:root:Starting training...
-INFO:root:Getting the training data from/data/suehara/mldata/pfa/ntau_10to100GeV_10/train
-INFO:root:Loaded the data and saved vocabularies
-INFO:root:Created model, computing logging frequencies...
-INFO:root:Logging frequencies computed, nlog_epoch modified as: 10 to 10. Number of losses that will be recorded is thus: 100 for the training set and 120
+INFO:root:Logging frequencies computed, nlog_epoch modified as: 10 to 10. Number of losses that will be recorded is thus: 100 for the training set and 100
 INFO:root:Starting training...
 INFO:root:Finished training for one epoch, going to valiation
 INFO:root:New best Model, saving...
-INFO:root:1 epoch done, time: 87.85614466667175, val_loss: 0.7938992810249329, train_loss: 0.8405698883533478
+INFO:root:1 epoch done, time: 764.030327796936, val_loss: 0.7839223900437355, train_loss: 0.8007177495583891
 INFO:root:Finished training for one epoch, going to valiation
 INFO:root:New best Model, saving...
-INFO:root:2 epoch done, time: 87.27155780792236, val_loss: 0.7836772608757019, train_loss: 0.7991961818933487
+INFO:root:2 epoch done, time: 763.7618560791016, val_loss: 0.7826177394390106, train_loss: 0.7792010117694735
 INFO:root:Finished training for one epoch, going to valiation
 INFO:root:New best Model, saving...
-INFO:root:3 epoch done, time: 87.31465435028076, val_loss: 0.7798932981491089, train_loss: 0.7934798377752305
+INFO:root:3 epoch done, time: 763.4423015117645, val_loss: 0.775299205482006, train_loss: 0.7733659103512764
 INFO:root:Finished training for one epoch, going to valiation
 INFO:root:New best Model, saving...
-INFO:root:4 epoch done, time: 87.31152296066284, val_loss: 0.7768039202690125, train_loss: 0.7892796781659126
+INFO:root:4 epoch done, time: 762.9958894252777, val_loss: 0.7737430113554001, train_loss: 0.7696130333468318
 INFO:root:Finished training for one epoch, going to valiation
 INFO:root:New best Model, saving...
-INFO:root:5 epoch done, time: 87.39159893989563, val_loss: 0.7752070331573486, train_loss: 0.7851806509494782
+INFO:root:5 epoch done, time: 763.0769155025482, val_loss: 0.7694501948356628, train_loss: 0.766162451133132
 INFO:root:Finished training for one epoch, going to valiation
 INFO:root:New best Model, saving...
-INFO:root:6 epoch done, time: 88.40326428413391, val_loss: 0.7732899260520935, train_loss: 0.7826000905036926
+INFO:root:6 epoch done, time: 764.7883794307709, val_loss: 0.7690411868691445, train_loss: 0.7635702978819608
 INFO:root:Finished training for one epoch, going to valiation
 INFO:root:New best Model, saving...
-INFO:root:7 epoch done, time: 87.5009195804596, val_loss: 0.7713138675689697, train_loss: 0.7799701994657516
+INFO:root:7 epoch done, time: 763.1427519321442, val_loss: 0.7692593303322792, train_loss: 0.7610939704626799
 INFO:root:Finished training for one epoch, going to valiation
 INFO:root:New best Model, saving...
-INFO:root:8 epoch done, time: 87.71702551841736, val_loss: 0.7683578681945801, train_loss: 0.777162846326828
+INFO:root:8 epoch done, time: 762.9059500694275, val_loss: 0.7646751463413238, train_loss: 0.7586119396239519
 INFO:root:Finished training for one epoch, going to valiation
 INFO:root:New best Model, saving...
-INFO:root:9 epoch done, time: 87.93983101844788, val_loss: 0.766073203086853, train_loss: 0.7749426266551018
+INFO:root:9 epoch done, time: 762.699684381485, val_loss: 0.7622741225361824, train_loss: 0.7566770995035768
 INFO:root:Finished training for one epoch, going to valiation
 INFO:root:New best Model, saving...
-INFO:root:10 epoch done, time: 87.83977127075195, val_loss: 0.7653424406051635, train_loss: 0.7727852576971054
+INFO:root:10 epoch done, time: 762.8118779659271, val_loss: 0.761975958943367, train_loss: 0.755211567953229
 INFO:root:Finished all epochs and saved the losses
