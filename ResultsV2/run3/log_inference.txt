@@ -1,0 +1,45 @@
+INFO:root:Inference chosen...
+INFO:root:Loading the vocabularies...
+INFO:root:Model created on cuda:5, now loading the source
+INFO:root:Saving normalizer...
+INFO:root:Going to inference now
+INFO:root:Batch done in 1.5438766479492188 seconds
+INFO:root:Batch done in 1.403210163116455 seconds
+INFO:root:Batch done in 1.568873405456543 seconds
+INFO:root:Batch done in 1.151390790939331 seconds
+INFO:root:Batch done in 1.4888763427734375 seconds
+INFO:root:Batch done in 1.2740724086761475 seconds
+INFO:root:Batch done in 1.3480093479156494 seconds
+INFO:root:Batch done in 1.0963761806488037 seconds
+INFO:root:Batch done in 1.147763729095459 seconds
+INFO:root:Batch done in 1.2633802890777588 seconds
+INFO:root:Batch done in 1.6502656936645508 seconds
+INFO:root:Batch done in 1.1842541694641113 seconds
+INFO:root:Batch done in 1.2808618545532227 seconds
+INFO:root:Batch done in 1.2190070152282715 seconds
+INFO:root:Batch done in 1.4059839248657227 seconds
+INFO:root:Batch done in 1.217932939529419 seconds
+INFO:root:Batch done in 1.027212142944336 seconds
+INFO:root:Batch done in 1.1378674507141113 seconds
+INFO:root:Batch done in 1.2147698402404785 seconds
+INFO:root:Batch done in 1.3339176177978516 seconds
+INFO:root:Batch done in 1.2674338817596436 seconds
+INFO:root:Batch done in 1.1634650230407715 seconds
+INFO:root:Batch done in 1.3066818714141846 seconds
+INFO:root:Batch done in 1.1866843700408936 seconds
+INFO:root:Batch done in 1.2011210918426514 seconds
+INFO:root:Batch done in 1.7599599361419678 seconds
+INFO:root:Batch done in 1.2336199283599854 seconds
+INFO:root:Batch done in 1.6989216804504395 seconds
+INFO:root:Batch done in 1.6004343032836914 seconds
+INFO:root:Batch done in 1.5412466526031494 seconds
+INFO:root:Batch done in 1.315701961517334 seconds
+INFO:root:Batch done in 1.1722300052642822 seconds
+INFO:root:Batch done in 1.0651674270629883 seconds
+INFO:root:Batch done in 1.1764984130859375 seconds
+INFO:root:Batch done in 1.2815022468566895 seconds
+INFO:root:Batch done in 1.3825843334197998 seconds
+INFO:root:Batch done in 1.1098651885986328 seconds
+INFO:root:Batch done in 1.4942317008972168 seconds
+INFO:root:Batch done in 1.1929616928100586 seconds
+INFO:root:Batch done in 1.2225685119628906 seconds
