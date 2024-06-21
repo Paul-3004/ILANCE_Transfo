@@ -5,7 +5,7 @@ import awkward as ak
 import numpy as np
 import glob
 from math import ceil
-
+from time import time
 '''creates masks to avoid padding tokens influencing the attention.
     Position with True will be ignored.
     args:
@@ -32,25 +32,27 @@ class AddSpecialSymbols(object):
         self.special_symbols = special_symbols
     
     def __call__(self, data, data_type: str):
+        nsamples = torch.from_numpy(ak.to_numpy(ak.num(data, axis = 1))).unsqueeze_(-1)
         #First adding (0,0) indicating hit/MC data at the end of features
-        ones = np.array(self.special_symbols["sample"])[np.newaxis][np.newaxis]
+        ones = np.array(self.special_symbols["sample"])[np.newaxis,np.newaxis, np.newaxis]
         feat_augmented = ak.concatenate((data,ones), axis = -1)
         #Adding bos and eos at beginning and end of each event
         nfeats = int(ak.num(data, axis = -1)[0,0]) #number of initial features
-        bos = np.array(([0] * nfeats + self.special_symbols["bos"]["cont"]))[np.newaxis]
-        eos = np.array(([0] * nfeats + self.special_symbols["eos"]["cont"]))[np.newaxis]
-        pad = np.array([0]*nfeats + self.special_symbols["pad"]["cont"]) 
+        bos = np.array(([0] * nfeats + [self.special_symbols["bos"]]))[np.newaxis]
+        eos = np.array(([0] * nfeats + [self.special_symbols["eos"]]))[np.newaxis]
+        pad = np.array([0]*nfeats + [self.special_symbols["pad"]])
+
         #setting charge and pdg features of tokens to corresponding values 
         if data_type == "labels":
-            np.put(pad,[0,1], self.special_symbols["pad"]["CEL"])
-            np.put(bos,[0,1], self.special_symbols["bos"]["CEL"])
-            np.put(eos,[0,1], self.special_symbols["eos"]["CEL"])
+            np.put(pad,[0,1], -50)
+            np.put(bos,[0,1],  -50)
+            np.put(eos,[0,1], -50)
 
         feat_augmented = ak.concatenate([bos[np.newaxis], feat_augmented, eos[np.newaxis]], axis = 1)
         #Padding
         nsample_max_event = int(ak.max(ak.num(feat_augmented,axis = 1))) #max number of samples in the batch
-        #target = nsample_max_event + 1 to keep <eos> token in target input of training
-        feat_padded = ak.pad_none(feat_augmented,target = nsample_max_event + 1, clip = True, axis = 1)
+        target = nsample_max_event + 1 #to keep <eos> token in target input of training 
+        feat_padded = ak.pad_none(feat_augmented,target =target, clip = True, axis = 1)
         
         return ak.fill_none(feat_padded, value = pad, axis = None)
     
@@ -61,15 +63,15 @@ class AddSpecialSymbols(object):
         keys: keys of the vocabulary, without special symbols
         special_keys: keys corresponding to the special symbols '''
 class Vocab(object):
-    def __init__(self,keys, special_keys = [-150,-100,-50]):
-        keys_pad = special_keys + keys
-        values = torch.arange(len(keys_pad))
-        self.vocab = dict(zip(keys_pad,values))
+    def __init__(self,keys, values  = None):
+        if values is None:
+            values = torch.arange(len(keys))
+        self.vocab = dict(zip(keys,values))
     
     @classmethod
     def from_dict(cls, dict_):
-        keys = list(dict_.keys())
-        return cls(keys[3:], keys[:3])
+        keys, values= list(dict_.keys()), list(dict_.values())
+        return cls(keys, values)
 
     def tokens_to_indices(self,tokens):
         unique,indices_unique = torch.unique(tokens, return_inverse= True)
@@ -97,13 +99,13 @@ class RMSNormalizer:
         self.RMS = RMS
 
     def normallize(self, data):
-        if np.all((self.RMS) > 1e-15):
-            return (data - self.mean)/self.RMS
+        if torch.all((self.RMS) > 1e-15):
+            data.sub_(self.mean).div_(self.RMS)
         else:
-            return data-self.mean
+            data.sub_(self.mean)
 
     def inverse_normalize(self, data_normalized):
-        return data_normalized * self.RMS + self.mean 
+        data_normalized.mul_(self.RMS).add_(self.mean)
     
     def set_attributes(self, mean, RMS):
         self.mean = mean
@@ -146,7 +148,7 @@ class CollectionHitsTraining(Dataset):
         filenames = list(sorted(glob.iglob(dir_path + '/*.h5')))
         nfiles = ceil(frac_files * len(filenames))
         #print(nfiles)
-        print("OLD VERSION")
+        print("NEW VERSION")
         if nfiles == 1:
             feats, labels = la.load_awkward2(filenames[0]) #get the events from the only file
         elif nfiles > 1:
@@ -154,6 +156,7 @@ class CollectionHitsTraining(Dataset):
         else:
             raise ValueError(f"There is no h5py file in the directory {dir_path}")
         
+        self.do_tracks = do_tracks
         #removing tracks
         if do_tracks is False:
             hits_mask = ~(feats[:,:,5] == 1)
@@ -171,25 +174,20 @@ class CollectionHitsTraining(Dataset):
         self.E_label_RMS_normalizer = RMSNormalizer()
         self.E_feats_RMS_normalizer = RMSNormalizer()
         self.pos_feats_RMS_normalizer = RMSNormalizer()
-        self.formatting(feats, self.shrink_labels(do_tracks,labels), special_symbols)
+        self.formatting(feats, labels, special_symbols)
     
-    def RMS_normalize(self, data, data_type: str):
+    def RMS_normalize(self, data,data_type: str):
+        mean = torch.mean(data, dim = 0)
+        RMS = torch.std(data, dim = 0)
         if data_type == "pos":
-            data_flat = ak.to_numpy(ak.flatten(data))
-            mean = ak.mean(data_flat, axis = 0)
-            data_centered = data_flat - mean
-            RMS = np.sqrt((1.0/int(ak.num(data_flat,axis = 0))) *np.einsum("ij,ij", data_centered, data_centered))
             self.pos_feats_RMS_normalizer.set_attributes(mean, RMS)
-            return ak.unflatten(self.pos_feats_RMS_normalizer.normallize(data_flat), ak.num(data, axis = 1))
-        else:
-            mean = ak.mean(data)
-            RMS = ak.std(data)
-            if data_type == "E_label":
+            self.pos_feats_RMS_normalizer.normallize(data)
+        elif data_type == "E_label":
                 self.E_label_RMS_normalizer.set_attributes(mean, RMS)
-                return self.E_label_RMS_normalizer.normallize(data)
-            if data_type == "E_feats":
+                self.E_label_RMS_normalizer.normallize(data)
+        elif data_type == "E_feats":
                 self.E_feats_RMS_normalizer.set_attributes(mean, RMS)
-                return self.E_feats_RMS_normalizer.normallize(data)
+                self.E_feats_RMS_normalizer.normallize(data)
            
 
     
@@ -200,44 +198,50 @@ class CollectionHitsTraining(Dataset):
         labels: ak.Array, ragged, features of each particle are (charge, pdg, m, px, py, pz)
     '''
     def formatting(self, feats, labels, special_symbols):
-        #Computing labels energy + total momentum
-        pvec = labels[...,-3:]
-        pvec_norm2 = ak.sum(np.square(pvec), axis = -1) 
-        E_label = np.log10(np.sqrt(np.square(labels[...,2]) + pvec_norm2)) # E = sqrt{m^2 + p^2}
-        indices_sort_E = ak.argsort(E_label, axis = -1, ascending= False)
-        E_label = self.RMS_normalize(E_label, "E_label")
-        cluster_direction = pvec / np.sqrt(pvec_norm2) #normalising momentum
-        charges = labels[...,0]
-        abs_pdg = np.abs(labels[...,1])
-        labels = ak.concatenate([ak.singletons(charges, axis = -1), #charge
-                                 ak.singletons(abs_pdg, axis = -1), #abs(pdg)
-                                 ak.singletons(E_label, axis = -1), #energy
-                                 cluster_direction], #normalised p
-                                 axis = -1)
-        labels = labels[indices_sort_E] #sorting by descending energy
-        #Normalizing E and positions of feats:
-        E_feat = np.log10(feats[...,0])
-        E_feat = self.RMS_normalize(E_feat, "E_feats")
-        pos = self.RMS_normalize(feats[...,1:], "pos")
-        feats = ak.concatenate([ak.singletons(E_feat,axis = -1), pos], axis = -1)
-        #Adding special symbols
+        #Adding special symbols after formatting feats and labels
         add_special_symbols = AddSpecialSymbols(special_symbols)
-        self.feats = torch.from_numpy(ak.to_numpy(add_special_symbols(feats, "feats"))).to(dtype = torch.float32)
-        self.labels = torch.from_numpy(ak.to_numpy(add_special_symbols(labels, "labels"))).to(dtype = torch.float32)
+        feats = add_special_symbols(self.format_feats(feats), "feats")
+        labels = add_special_symbols(self.format_labels(labels), "labels")
+        feats = torch.from_numpy(ak.to_numpy(feats)).to(dtype = torch.float32)
+        labels = torch.from_numpy(ak.to_numpy(labels)).to(dtype = torch.float32)
+        self.labels = labels
+        self.feats = feats
 
         #Creating vocabularies:
-        charges_keys = np.unique(ak.to_numpy(ak.flatten(charges))).tolist()
-        abs_pdg_keys = np.unique(ak.to_numpy(ak.flatten(abs_pdg))).tolist()
-        special_tokens_CEL = [val["CEL"] for val in special_symbols.values() if isinstance(val, dict)]
-        self.vocab_charges = Vocab(charges_keys, special_tokens_CEL)
-        self.vocab_pdgs = Vocab(abs_pdg_keys, special_tokens_CEL)
-        self.labels[...,0] = self.vocab_charges.tokens_to_indices(self.labels[...,0])
-        self.labels[...,1] = self.vocab_pdgs.tokens_to_indices(self.labels[...,1])
-    
+        charges_keys = [-50,-1,0,1]
+        abs_pdg_keys = torch.unique(labels[...,1]).tolist()
+        self.vocab_charges = Vocab(charges_keys)
+        self.vocab_pdgs = Vocab(abs_pdg_keys)
+        labels[...,0] = self.vocab_charges.tokens_to_indices(labels[...,0])
+        labels[...,1] = self.vocab_pdgs.tokens_to_indices(labels[...,1])
+
+    '''called during shrink_labels to compute energy and normalize momentum
+        Args:
+            labels_flat: numpy array as a flatten version of labels 
+                         features are in order:  (mass, px, py, pz)
+                         
+    '''    
+    def format_E_pos_label(self, labels_flat):
+        #Computing energies
+        E = labels_flat[...,0]
+        pvec = labels_flat[...,-3:]
+        pvec_norm2 = torch.sum(torch.square(pvec), dim = -1) 
+        #Computing Energy, normalizing and sorting
+        E.square_().add_(pvec_norm2).sqrt_() # E = sqrt{m^2 + p^2}
+        E.log10_()
+        self.RMS_normalize(E, "E_label")
+        pvec.div_(pvec_norm2.sqrt_().unsqueeze_(-1))
+
     '''Keep only 1 representative of each clusters in the label dataset 
-        and keep only the features (charge, pdg, m, px,py,z)'''
-    def shrink_labels(self, do_track, labels):
-        if do_track is True:
+        and keep only the features (charge, pdg, E, px,py,z)
+        Args:
+            do_track: to remove track info since hasn't been done previously
+            labels: ak.Array with features: (hitid, mcid, pdg, charge, mass, px, py, pz (of mcp), status)
+        
+        Note: To avoid additional copies when c
+    '''
+    def format_labels(self, labels):
+        if self.do_tracks is True:
             track_mask = (labels[...,0] > 1e-15) #(hitid <= 0) <-> tracks
             labels = labels[track_mask]
         
@@ -254,9 +258,24 @@ class CollectionHitsTraining(Dataset):
         #computing the indices of every unique entry of the flattened array
         _, indices_unique = np.unique(ak.to_numpy(mc_id_flat), axis = 0, return_index = True) 
 
-        labels__flat = ak.flatten(labels, axis = 1)[indices_unique] #taking first representative 
+        labels_flat = ak.flatten(labels, axis = 1)[indices_unique] #taking first representative 
+        labels_flat_torch = torch.from_numpy(labels_flat.to_numpy()) #ref 
+        labels_flat_torch[...,2].abs_() #absolute value of PDGs
+        self.format_E_pos_label(labels_flat_torch[...,4:8])
         indices_features = [3,2,4,5,6,7] #3: charge 2: pdg, 4: mass, 5-7: momentum (mass to compute energy)
-        return ak.unflatten(labels__flat, dim_count)[..., indices_features] #putting back to expected shape
+        #norm2_torch = labels_flat_torch[]
+        labels = ak.unflatten(labels_flat_torch.numpy(), dim_count)[..., indices_features] #putting back to expected shape
+        indices_sort_E = ak.argsort(labels[...,2], axis = -1, ascending= False)
+        return labels[indices_sort_E] #sorting by descending energy
+
+    def format_feats(self, feats):
+        dim = ak.num(feats,axis = 1)
+        feats_flat_np = ak.flatten(feats).to_numpy()
+        feats_flat_torch = torch.from_numpy(feats_flat_np)
+        self.RMS_normalize(feats_flat_torch[...,0], "E_feat")
+        self.RMS_normalize(feats_flat_torch[...,-3:], "pos")
+        return ak.unflatten(feats_flat_np, counts = dim)
+
 
     #necessary methods to override
     #called when applying len(), must be an integer (note: same numbers of feats than label)
@@ -268,88 +287,13 @@ class CollectionHitsTraining(Dataset):
     def __getitem__(self,id1):
         return self.feats[id1], self.labels[id1]
 
-'''Custom Dataset to store the hits and tracks
-        Raw Data:
-            feats: 3D awkward array of size (N,P,F), where 
-                - N: number of events (50/file)
-                - P: number of hits + tracks per event (variable size)
-                - F: number of features = 10 (edep, x, y, z, time, track, charge, px, py, pz) in this order
-                    if track is 0: hit in calorimeter, no info on momentum and charge (all set to 0)
-                             is 1: x,y,z is pos of entry in calorimeter, px,py,pz, momentum from trajectory
-            
-        Attributes: Obtained by transforming raw data
-            - feats will be sliced to only contained edep, x, y, z, t (optional). All normalised
-            '''
-class CollectionHitsInference(Dataset):
-    '''args:
-            dir_path: string path of directory where data is stored
-            special_symbols: dict containing the special symbols. format is of the form
-                special_symbols = {"pad": {"cont": pad_cont, "CEL": pad_CEL},
-                                    "bos: {"cont": bos_cont, "CEL": bos_CEL},
-                                    "eos": {"cont": eos_cont, "CEL": eos_CEL},
-                                    "sample": sample_cont}
-            do_tracks: bool. If true, tracks are stored in the Dataset
-            do_time: bool, if True, time of hits is kept'''
-    def __init__(self, dir_path: str, special_symbols: dict,do_tracks: bool = False, do_time: bool = False):
-        super(CollectionHitsInference,self).__init__()
-        filenames = list(sorted(glob.iglob(dir_path + '/*.h5')))
-        if len(filenames) == 1:
-            feats, _ = la.load_awkward2(filenames) #get the events from the only file
-        elif len(filenames) > 1:
-            feats, _ = la.load_awkwards(filenames) #get the events from each file
-        else:
-            raise ValueError(f"There is no h5py file in the directory {dir_path}")
-        
-        #removing tracks
-        if do_tracks is False:
-            hits_mask = ~(feats[:,:,5] == 1)
-            feats = feats[hits_mask]
-        #keeping time
-        if do_time:
-            feats = feats[:,:,:5]
-        else:
-            feats = feats[:,:,:4]
 
-        self.formatting(feats, special_symbols)
-    
-    #formats the feats by adding special tokens and normalising.
-    def formatting(self, feats, special_symbols):
-        #Adding special symbols
-        add_special_symbols = AddSpecialSymbols(special_symbols)
-        self.feats = torch.from_numpy(ak.to_numpy(add_special_symbols(feats, "feats")))
-
-        #Normalising feats inplace
-        self.feats[:,:,0] = torch.tanh(self.feats[:,:,0]) #energy
-        self.feats[:,:,1:3] /= 2000. #position in detector
-        
-    def __len__(self):
-        return self.feats.size(dim = 0)
-    
-    #called when indexing the dataset
-    def __getitem__(self,id1):
-        return self.feats[id1]
-
-    
-
-
-# def get_data(dir_path, batch_size, special_symbols, model_mode: str):
-#     if model_mode == "training":
-#         data_set = CollectionHitsTraining(dir_path,special_symbols)
-#         vocab_charges, vocab_pdgs = data_set.vocab_charges, data_set.vocab_pdgs
-#         E_label_RMSNormalizer = data_set.E_label_RMS_normalizer
-#         return (vocab_charges, vocab_pdgs, E_label_RMSNormalizer, DataLoader(data_set, batch_size= batch_size))    
-
-#     elif model_mode == "inference":
-#         data_set = CollectionHitsInference(dir_path, special_symbols)
-#         return DataLoader(data_set, batch_size = batch_size)
-#     else:
-#         raise ValueError(model_mode + " is an invalid entry. Must be either training or inference")    
 def get_data(dir_path, batch_size, frac_files,model_mode:str):
     special_symbols = {
-            "pad": {"cont": [0.,1.],"CEL":-150},
-            "bos": {"cont": [1.,1.], "CEL":-100},
-            "eos": {"cont": [1.,0.],"CEL":-50},
-            "sample": [0.,0.]
+            "pad": 0,
+            "bos": 1,
+            "eos": 2,
+            "sample": 3
     }
     if model_mode == "training":
         dir_path_train, dir_path_val = dir_path
@@ -377,21 +321,44 @@ def get_data(dir_path, batch_size, frac_files,model_mode:str):
     else:
         raise ValueError(model_mode + " is an invalid entry. Must be either training or inference")    
 
-
-special_symbols = {
-            "pad": {"cont": [0.,1.],"CEL":-150},
-            "bos": {"cont": [1.,1.], "CEL":-100},
-            "eos": {"cont": [1.,0.],"CEL":-50},
-            "sample": [0.,0.]
+def train_val_preprocessing(dir_train, dir_val, dir_res):
+    special_symbols = {
+            "pad": 0,
+            "bos": 1,
+            "eos": 2,
+            "sample": 3
     }
+    preprocessing(dir_train, dir_res, "training",special_symbols)
+    preprocessing(dir_val, dir_res, "validation",special_symbols)
+
+def preprocessing(dir_data, dir_res, datatype: str, special_symbols):
+    start = time()
+    ds = CollectionHitsTraining(dir_data, special_symbols,1)
+    end = time() - start
+    print(f"time needed to make preprocessing: {end} sec")
+    E_label_normalizer = ds.E_label_RMS_normalizer
+    nevents = len(ds.feats)
+    nevents_per_file = int(nevents * 0.02)
+    print(nevents_per_file)
+    vocab_charges, vocab_pdgs = ds.vocab_charges, ds.vocab_pdgs
+    torch.save([vocab_charges.vocab, vocab_pdgs.vocab, E_label_normalizer], dir_res + "/vocabs/" + datatype + "/vocabs_normalizer.pt")
+    dl = DataLoader(ds, batch_size= nevents_per_file)
+
+    for i, (feats, labels) in enumerate(dl):
+        torch.save([feats, labels], dir_res + datatype + f"/ntau_10to100GeV_{i}")
+        print(f"file {i+1} saved")
+    
+
 
 testing = False
 if testing:
     dir_path = "/Users/paulwahlen/Desktop/Internship/ML/Code/TransfoV1/data"
     vocab_charges, vocab_pgs, special_symbols,E_label_RMSNormalizer, data_ld, val_dl = get_data((dir_path,dir_path),25,0.1, "training")
     feat0,label0 = next(iter(data_ld))
-    print(label0[0,:,2])
-    print(torch.max(feat0[0]))
+    print(label0[0,:10])
+    pvec = label0[0,:,-4:-1]
+    print(torch.sum(torch.square(pvec), dim = -1))
+    #print(torch.max(feat0[0]))
     #print(label0[0].size(dim = 0))
     #print(vocab_charges.indices_to_tokens(label0[0,:,0]))
     #print(feats0[0])
@@ -402,3 +369,4 @@ if testing:
         mean_E += torch.mean(batch_feat[...,0])     #mean energy
     
     print(mean_E)
+

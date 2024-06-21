@@ -3,5 +3,6 @@ Results/*/best_model1.pt
 testing.ipynb
 Analysis
 Results/*/Graphs
+ResultsV2/*/Graphs
 Comparisons
 ResultsV2/*/best_model.pt
