@@ -140,41 +140,56 @@ class CollectionHitsTraining(Dataset):
                                     "sample": sample_cont}
             do_tracks: bool. If true, tracks are stored in the Dataset
             do_time: bool, if True, time of hits is kept'''
-    def __init__(self, dir_path: str, special_symbols: dict,frac_files: float,do_tracks: bool = False, do_time: bool = False):
+    def __init__(self, dir_path: str, special_symbols: dict,frac_files: float,preprocessed: bool = False,do_tracks: bool = False, do_time: bool = False):
         if frac_files < 0 or frac_files > 1:
             raise ValueError("The fraction of files must lie inbetween 0 and 1")
 
         super(CollectionHitsTraining,self).__init__()
-        filenames = list(sorted(glob.iglob(dir_path + '/*.h5')))
-        nfiles = ceil(frac_files * len(filenames))
-        #print(nfiles)
-        print("NEW VERSION")
-        if nfiles == 1:
-            feats, labels = la.load_awkward2(filenames[0]) #get the events from the only file
-        elif nfiles > 1:
-            feats, labels = la.load_awkwards(filenames[:nfiles]) #get the events from each file
+        if preprocessed:
+            nfiles = ceil(frac_files / 0.02)
+            filenames = list(sorted(glob.iglob(dir_path + 'data/*')))
+            vocab_path = dir_path + "vocabs/vocabs_normalizer.pt"
+            charges_dict, pdgs_dict, self.E_label_RMS_normalizer = torch.load(vocab_path)
+            self.vocab_charges, self.vocab_pdgs = Vocab.from_dict(charges_dict), Vocab.from_dict(pdgs_dict)
+            feats, labels = [], []
+            for f in filenames:
+                feats_f, labels_f = torch.load(f)
+                feats.append(feats_f)
+                labels.append(labels_f)
+            
+            self.feats = torch.concatenate(feats)
+            self.labels = torch.concatenate(labels)
         else:
-            raise ValueError(f"There is no h5py file in the directory {dir_path}")
-        
-        self.do_tracks = do_tracks
-        #removing tracks
-        if do_tracks is False:
-            hits_mask = ~(feats[:,:,5] == 1)
-            feats = feats[hits_mask]
-            labels = labels[hits_mask]
-        #keeping time
-        if do_time:
-            feats = feats[:,:,:5]
-        else:
-            feats = feats[:,:,:4]
+            filenames = list(sorted(glob.iglob(dir_path + '/*.h5')))
+            nfiles = ceil(frac_files * len(filenames))
+            #print(nfiles)
+            print("NEW VERSION")
+            if nfiles == 1:
+                feats, labels = la.load_awkward2(filenames[0]) #get the events from the only file
+            elif nfiles > 1:
+                feats, labels = la.load_awkwards(filenames[:nfiles]) #get the events from each file
+            else:
+                raise ValueError(f"There is no h5py file in the directory {dir_path}")
+            
+            self.do_tracks = do_tracks
+            #removing tracks
+            if do_tracks is False:
+                hits_mask = ~(feats[:,:,5] == 1)
+                feats = feats[hits_mask]
+                labels = labels[hits_mask]
+            #keeping time
+            if do_time:
+                feats = feats[:,:,:5]
+            else:
+                feats = feats[:,:,:4]
 
-        PDGs_mask = np.abs(labels[...,2]) < 1e3
-        labels = labels[PDGs_mask]
+            PDGs_mask = np.abs(labels[...,2]) < 1e3
+            labels = labels[PDGs_mask]
 
-        self.E_label_RMS_normalizer = RMSNormalizer()
-        self.E_feats_RMS_normalizer = RMSNormalizer()
-        self.pos_feats_RMS_normalizer = RMSNormalizer()
-        self.formatting(feats, labels, special_symbols)
+            self.E_label_RMS_normalizer = RMSNormalizer()
+            self.E_feats_RMS_normalizer = RMSNormalizer()
+            self.pos_feats_RMS_normalizer = RMSNormalizer()
+            self.formatting(feats, labels, special_symbols)
     
     def RMS_normalize(self, data,data_type: str):
         mean = torch.mean(data, dim = 0)
@@ -288,17 +303,18 @@ class CollectionHitsTraining(Dataset):
         return self.feats[id1], self.labels[id1]
 
 
-def get_data(dir_path, batch_size, frac_files,model_mode:str):
+def get_data(dir_path, batch_size, frac_files,model_mode:str, preprocessed: bool = False):
     special_symbols = {
             "pad": 0,
             "bos": 1,
             "eos": 2,
             "sample": 3
     }
+    print(preprocessed)
     if model_mode == "training":
         dir_path_train, dir_path_val = dir_path
-        data_set_train = CollectionHitsTraining(dir_path_train,special_symbols, frac_files)
-        data_set_val = CollectionHitsTraining(dir_path_val, special_symbols, frac_files)
+        data_set_train = CollectionHitsTraining(dir_path_train,special_symbols, frac_files, preprocessed)
+        data_set_val = CollectionHitsTraining(dir_path_val, special_symbols, frac_files, preprocessed)
         vocab_charges, vocab_pdgs = data_set_train.vocab_charges, data_set_train.vocab_pdgs
         vocab_charges_val, vocab_pdgs_val = data_set_val.vocab_charges, data_set_val.vocab_pdgs
 
@@ -315,7 +331,7 @@ def get_data(dir_path, batch_size, frac_files,model_mode:str):
 
     elif model_mode == "inference":
         dir_path_inference = dir_path[0]
-        data_set = CollectionHitsTraining(dir_path_inference, special_symbols, frac_files)
+        data_set = CollectionHitsTraining(dir_path_inference, special_symbols, frac_files, preprocessed)
         E_label_RMSNormalizer = data_set.E_label_RMS_normalizer
         return special_symbols, E_label_RMSNormalizer, DataLoader(data_set, batch_size = batch_size)
     else:
