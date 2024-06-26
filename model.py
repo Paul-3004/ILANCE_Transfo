@@ -221,6 +221,7 @@ class ClustersFinder(nn.Module):
         self.lastlin_charge = nn.Linear(d_out_embedder_tgt,ncharges_max, dtype= dtype)
         self.lastlin_pdg = nn.Linear(d_out_embedder_tgt,nparticles_max, dtype = dtype)
         self.lastlin_cont = nn.Linear(d_out_embedder_tgt,DOF_continous, dtype= dtype)
+        self.lastlin_tokens = nn.Linear(d_out_embedder_tgt, 4, dtype = dtype) #3 for pad, bos, sample, eos
 
     '''forward will be called when the __call__ function of nn.Module will be called., used for training
         args:
@@ -246,7 +247,8 @@ class ClustersFinder(nn.Module):
         
         return (self.lastlin_charge(output), #unnormalised probabilities for charge
                 self.lastlin_pdg(output), #unnormalised probabilities for pdg
-                self.lastlin_cont(output) ) #Continuous regression
+                self.lastlin_cont(output), #Continuous regression
+                self.lastlin_tokens(output) )
 
     def	generate_causal_mask(self,sz, device):
         return torch.triu(torch.ones(sz,sz), diagonal = 1).type(torch.bool).to(device = device)

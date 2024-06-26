@@ -17,8 +17,8 @@ from time import time
         tgt_padding_mask: mask for the target padding tokens, shape: (N,T)'''
 def create_mask(src, tgt, pad_symbol, device):
     pad_symbol_broad = torch.tensor(pad_symbol).unsqueeze(0).unsqueeze(0).to(device)
-    src_padding_mask = torch.all((src[...,-2:] == pad_symbol_broad), dim = -1).to(device)
-    tgt_padding_mask = torch.all((tgt[...,-2:]== pad_symbol_broad), dim = -1).to(device)
+    src_padding_mask = torch.all((src[...,-1] == pad_symbol_broad), dim = -1).to(device)
+    tgt_padding_mask = torch.all((tgt[...,-1] == pad_symbol_broad), dim = -1).to(device)
 
     return src_padding_mask, tgt_padding_mask
 
@@ -147,8 +147,8 @@ class CollectionHitsTraining(Dataset):
         super(CollectionHitsTraining,self).__init__()
         if preprocessed:
             nfiles = ceil(frac_files / 0.02)
-            filenames = list(sorted(glob.iglob(dir_path + '/data/*.pt')))
-            vocab_path = dir_path + "/vocabs/vocabs_normalizer.pt"
+            filenames = list(sorted(glob.iglob(dir_path + 'data/*')))
+            vocab_path = dir_path + "vocabs/vocabs_normalizer.pt"
             charges_dict, pdgs_dict, self.E_label_RMS_normalizer = torch.load(vocab_path)
             self.vocab_charges, self.vocab_pdgs = Vocab.from_dict(charges_dict), Vocab.from_dict(pdgs_dict)
             feats, labels = [], []
@@ -162,10 +162,15 @@ class CollectionHitsTraining(Dataset):
         else:
             filenames = list(sorted(glob.iglob(dir_path + '/*.h5')))
             nfiles = ceil(frac_files * len(filenames))
-            print(nfiles)
+            #print(nfiles)
             print("NEW VERSION")
-            feats, labels = self._get_data(filenames, nfiles)
-            print(frac_files)
+            if nfiles == 1:
+                feats, labels = la.load_awkward2(filenames[0]) #get the events from the only file
+            elif nfiles > 1:
+                feats, labels = la.load_awkwards(filenames[:nfiles]) #get the events from each file
+            else:
+                raise ValueError(f"There is no h5py file in the directory {dir_path}")
+            
             self.do_tracks = do_tracks
             #removing tracks
             if do_tracks is False:
@@ -185,18 +190,7 @@ class CollectionHitsTraining(Dataset):
             self.E_feats_RMS_normalizer = RMSNormalizer()
             self.pos_feats_RMS_normalizer = RMSNormalizer()
             self.formatting(feats, labels, special_symbols)
-
-    def _get_data(self,filenames, nfiles, dtype = np.float32):
-        if nfiles == 1:
-            feats, labels = la.load_awkward2(filenames[0]) #get the events from the only file
-        elif nfiles > 1:
-            feats, labels = la.load_awkwards(filenames[:nfiles]) #get the events from each file
-        else:
-            raise ValueError(f"There is no h5py file in the directory {dir_path}")
-        return ak.values_astype(feats,np.float32), ak.values_astype(labels,np.float32)
-                        
-        
-
+    
     def RMS_normalize(self, data,data_type: str):
         mean = torch.mean(data, dim = 0)
         RMS = torch.std(data, dim = 0)
@@ -343,24 +337,19 @@ def get_data(dir_path, batch_size, frac_files,model_mode:str, preprocessed: bool
     else:
         raise ValueError(model_mode + " is an invalid entry. Must be either training or inference")    
 
-def train_val_preprocessing(dir_train, dir_val, dir_res, frac_files):
+def train_val_preprocessing(dir_train, dir_val, dir_res):
     special_symbols = {
             "pad": 0,
             "bos": 1,
             "eos": 2,
             "sample": 3
     }
+    preprocessing(dir_train, dir_res, "training",special_symbols)
+    preprocessing(dir_val, dir_res, "validation",special_symbols)
+
+def preprocessing(dir_data, dir_res, datatype: str, special_symbols):
     start = time()
-    preprocessing(dir_train, dir_res, "training",special_symbols, frac_files)
-    dt_train = time() - start
-    start = time()
-    preprocessing(dir_val, dir_res, "validation",special_symbols, frac_files)
-    dt_val = time() - start
-    print(f"time for training: {dt_train} sec, time for validation: {dt_val} sec")
-    
-def preprocessing(dir_data, dir_res, datatype: str, special_symbols, frac_files):
-    start = time()
-    ds = CollectionHitsTraining(dir_data, special_symbols,frac_files)
+    ds = CollectionHitsTraining(dir_data, special_symbols,1)
     end = time() - start
     print(f"time needed to make preprocessing: {end} sec")
     E_label_normalizer = ds.E_label_RMS_normalizer
@@ -372,7 +361,7 @@ def preprocessing(dir_data, dir_res, datatype: str, special_symbols, frac_files)
     dl = DataLoader(ds, batch_size= nevents_per_file)
 
     for i, (feats, labels) in enumerate(dl):
-        torch.save([feats, labels], dir_res + "/" + datatype + f"/data/ntau_10to100GeV_{i}.pt")
+        torch.save([feats, labels], dir_res + datatype + f"/ntau_10to100GeV_{i}")
         print(f"file {i+1} saved")
     
 
@@ -397,5 +386,3 @@ if testing:
     
     print(mean_E)
 
-
-    
