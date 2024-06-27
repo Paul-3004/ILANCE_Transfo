@@ -293,9 +293,10 @@ def train_epoch(model, optim, train_dl, special_symbols,vocab_charges, vocab_pdg
         #Using spherical coordinates to get 3D direction vectors
         logits_cont = get_cartesian_from_angles(logits_cont)
         #special_tokens are not taken into account in the continuous loss
-        eos_bos_mask = ((tgt_out_tokens == vocab_charges.get_index(special_symbols["eos"]))
-                        + (tgt_out_tokens == vocab_charges.get_index(special_symbols["bos"]))) 
-        spe_tokens_mask = eos_bos_mask + tgt_out_padding_mask
+        #eos_bos_mask = ((tgt_out_tokens == vocab_charges.get_index(special_symbols["eos"]))
+        #                + (tgt_out_tokens == vocab_charges.get_index(special_symbols["bos"]))) 
+        #spe_tokens_mask = eos_bos_mask + tgt_out_padding_mask
+        spe_tokens_mask = ~(tgt_out_tokens == special_symbols["sample"])
         #Computing the losses
         loss_charges = loss_fn_charges(logits_charges.transpose(dim0 = -2, dim1 = -1), tgt_out_charges)
         loss_pdg = loss_fn_pdg(logits_pdg.transpose(dim0 = -2, dim1 = -1), tgt_out_pdg)
@@ -373,9 +374,9 @@ def validate_epoch(model, val_dl, special_symbols,vocab_charges, vocab_pdgs, E_r
         #Using spherical coordinates to get 3D direction vectors
         logits_cont = get_cartesian_from_angles(logits_cont)
         #special_tokens are not taken into account in the continuous loss
-        eos_bos_mask = ((tgt_out_tokens == vocab_charges.get_index(special_symbols["eos"]))
-                        + (tgt_out_tokens == vocab_charges.get_index(special_symbols["bos"]))) 
-        spe_tokens_mask = eos_bos_mask + tgt_out_padding_mask
+        #eos_bos_mask = ((tgt_out_tokens == vocab_charges.get_index(special_symbols["eos"]))
+        #                + (tgt_out_tokens == vocab_charges.get_index(special_symbols["bos"]))) 
+        spe_tokens_mask = ~(tgt_out_tokens = special_symbols["sample"])
         #Computing the losses
         loss_charges = loss_fn_charges(logits_charges.transpose(dim0 = -2, dim1 = -1), tgt_out_charges)
         loss_pdg = loss_fn_pdg(logits_pdg.transpose(dim0 = -2, dim1 = -1), tgt_out_pdg)
