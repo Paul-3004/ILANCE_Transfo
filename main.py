@@ -229,7 +229,10 @@ def inference(config, args):
         dtype = torch.float32
     
     
-    special_symbols, E_label_RMS_normalizer, src_loader = get_data((config["dir_path_inference"], ), config["batch_size_test"], config["frac_files_test"], "inference")
+    special_symbols, E_label_RMS_normalizer, src_loader = get_data((config["dir_path_inference"], ), 
+                                                                    config["batch_size_test"], 
+                                                                    config["frac_files_test"], "inference", 
+                                                                    config["preprocessed"], config["E_cut"])
     logging.info("Saving normalizer...")
     torch.save(E_label_RMS_normalizer, config["dir_results"] + "E_RMS_normalizer.pt")
     logging.info("Going to inference now")
@@ -427,7 +430,8 @@ def train_and_validate(config, args):
                                                                                               batch_size = config["batch_size"], 
                                                                                               frac_files = config["frac_files"],
                                                                                               model_mode = "training",
-                                                                                              preprocessed= config["preprocessed"])
+                                                                                              preprocessed= config["preprocessed"],
+                                                                                              E_cut= config["E_cut"])
     torch.save(vocab_charges.vocab, config["dir_results"] + "vocab_charges.pt")
     torch.save(vocab_pdgs.vocab, config["dir_results"] + "vocab_PDGs.pt")
     
