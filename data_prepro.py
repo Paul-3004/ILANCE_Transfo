@@ -17,8 +17,8 @@ from time import time
         tgt_padding_mask: mask for the target padding tokens, shape: (N,T)'''
 def create_mask(src, tgt, pad_symbol, device):
     pad_symbol_broad = torch.tensor(pad_symbol).unsqueeze(0).unsqueeze(0).to(device)
-    src_padding_mask = torch.all((src[...,-1] == pad_symbol_broad), dim = -1).to(device)
-    tgt_padding_mask = torch.all((tgt[...,-1] == pad_symbol_broad), dim = -1).to(device)
+    src_padding_mask = src[...,-1] == pad_symbol_broad
+    tgt_padding_mask = tgt[...,-1] == pad_symbol_broad
 
     return src_padding_mask, tgt_padding_mask
 
@@ -147,8 +147,8 @@ class CollectionHitsTraining(Dataset):
         super(CollectionHitsTraining,self).__init__()
         if preprocessed:
             nfiles = ceil(frac_files / 0.02)
-            filenames = list(sorted(glob.iglob(dir_path + 'data/*')))
-            vocab_path = dir_path + "vocabs/vocabs_normalizer.pt"
+            filenames = list(sorted(glob.iglob(dir_path + '/data/*.pt')))
+            vocab_path = dir_path + "/vocabs/vocabs_normalizer.pt"
             charges_dict, pdgs_dict, self.E_label_RMS_normalizer = torch.load(vocab_path)
             self.vocab_charges, self.vocab_pdgs = Vocab.from_dict(charges_dict), Vocab.from_dict(pdgs_dict)
             feats, labels = [], []
