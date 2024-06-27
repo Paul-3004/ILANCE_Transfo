@@ -131,16 +131,21 @@ class RMSNormalizer:
                 Only one representative of each cluster is kept (the rest is duplicata anyways)
             '''
 class CollectionHitsTraining(Dataset):
-    '''args:
+    def __init__(self, dir_path: str, special_symbols: dict,frac_files: float,
+                 preprocessed: bool = False, E_cut: float = 0.1, do_tracks: bool = False, 
+                 do_time: bool = False):
+        '''args:
             dir_path: string path of directory where data is stored
             special_symbols: dict containing the special symbols. format is of the form
                 special_symbols = {"pad": {"cont": pad_cont, "CEL": pad_CEL},
                                     "bos: {"cont": bos_cont, "CEL": bos_CEL},
                                     "eos": {"cont": eos_cont, "CEL": eos_CEL},
                                     "sample": sample_cont}
+            preprocessed: bool. If True, preprocessed data will be loaded
             do_tracks: bool. If true, tracks are stored in the Dataset
-            do_time: bool, if True, time of hits is kept'''
-    def __init__(self, dir_path: str, special_symbols: dict,frac_files: float,preprocessed: bool = False,do_tracks: bool = False, do_time: bool = False):
+            do_time: bool, if True, time of hits is kept
+            E_cut: float, energy value [GeV] above which clusters are kept
+            '''
         if frac_files < 0 or frac_files > 1:
             raise ValueError("The fraction of files must lie inbetween 0 and 1")
 
@@ -171,6 +176,7 @@ class CollectionHitsTraining(Dataset):
             else:
                 raise ValueError(f"There is no h5py file in the directory {dir_path}")
             
+            self.E_cut = E_cut
             self.do_tracks = do_tracks
             #removing tracks
             if do_tracks is False:
@@ -219,6 +225,7 @@ class CollectionHitsTraining(Dataset):
         labels = add_special_symbols(self.format_labels(labels), "labels")
         feats = torch.from_numpy(ak.to_numpy(feats)).to(dtype = torch.float32)
         labels = torch.from_numpy(ak.to_numpy(labels)).to(dtype = torch.float32)
+
         self.labels = labels
         self.feats = feats
 
@@ -280,6 +287,9 @@ class CollectionHitsTraining(Dataset):
         indices_features = [3,2,4,5,6,7] #3: charge 2: pdg, 4: mass, 5-7: momentum (mass to compute energy)
         #norm2_torch = labels_flat_torch[]
         labels = ak.unflatten(labels_flat_torch.numpy(), dim_count)[..., indices_features] #putting back to expected shape
+        #Discarding low energy clusters 
+        E_mask = labels[...,2] > self.E_cut
+        labels = labels[E_mask]
         indices_sort_E = ak.argsort(labels[...,2], axis = -1, ascending= False)
         return labels[indices_sort_E] #sorting by descending energy
 
@@ -303,7 +313,7 @@ class CollectionHitsTraining(Dataset):
         return self.feats[id1], self.labels[id1]
 
 
-def get_data(dir_path, batch_size, frac_files,model_mode:str, preprocessed: bool = False):
+def get_data(dir_path, batch_size, frac_files,model_mode:str, preprocessed: bool = False, E_cut: float = 0.1):
     special_symbols = {
             "pad": 0,
             "bos": 1,
@@ -313,8 +323,8 @@ def get_data(dir_path, batch_size, frac_files,model_mode:str, preprocessed: bool
     print(preprocessed)
     if model_mode == "training":
         dir_path_train, dir_path_val = dir_path
-        data_set_train = CollectionHitsTraining(dir_path_train,special_symbols, frac_files, preprocessed)
-        data_set_val = CollectionHitsTraining(dir_path_val, special_symbols, frac_files, preprocessed)
+        data_set_train = CollectionHitsTraining(dir_path_train,special_symbols, frac_files, preprocessed, E_cut)
+        data_set_val = CollectionHitsTraining(dir_path_val, special_symbols, frac_files, preprocessed, E_cut)
         vocab_charges, vocab_pdgs = data_set_train.vocab_charges, data_set_train.vocab_pdgs
         vocab_charges_val, vocab_pdgs_val = data_set_val.vocab_charges, data_set_val.vocab_pdgs
 
