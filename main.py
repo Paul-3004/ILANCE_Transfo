@@ -232,7 +232,7 @@ def inference(config, args):
     special_symbols, E_label_RMS_normalizer, src_loader = get_data((config["dir_path_inference"], ), 
                                                                     config["batch_size_test"], 
                                                                     config["frac_files_test"], "inference", 
-                                                                    config["preprocessed"], config["E_cut"])
+                                                                    config["preprocessed"], config["E_cut"], config["shuffle"])
     logging.info("Saving normalizer...")
     torch.save(E_label_RMS_normalizer, config["dir_results"] + "E_RMS_normalizer.pt")
     logging.info("Going to inference now")
@@ -289,7 +289,7 @@ def train_epoch(model, optim, train_dl, special_symbols,vocab_charges, vocab_pdg
         tgt_out_charges = tgt_out[...,0].to(torch.long)
         tgt_out_pdg = tgt_out[...,1].to(torch.long)
         tgt_out_cont = tgt_out[...,2:-1] #only (E, n_x,n_y,n_z)
-        tgt_out_tokens = tgt_out[...,-1]
+        tgt_out_tokens = tgt_out[...,-1].to(torch.long)
         #Using spherical coordinates to get 3D direction vectors
         logits_cont = get_cartesian_from_angles(logits_cont)
         #special_tokens are not taken into account in the continuous loss
@@ -365,18 +365,17 @@ def validate_epoch(model, val_dl, special_symbols,vocab_charges, vocab_pdgs, E_r
                                                                 src_padding_mask,
                                                                 tgt_in_padding_mask,
                                                                 src_padding_mask)
-        optim.zero_grad()
         tgt_out = tgt[:,1:,:] #logits are compared with tokens shifted
         tgt_out_charges = tgt_out[...,0].to(torch.long)
         tgt_out_pdg = tgt_out[...,1].to(torch.long)
         tgt_out_cont = tgt_out[...,2:-1] #only (E, n_x,n_y,n_z)
-        tgt_out_tokens = tgt_out[...,-1]
+        tgt_out_tokens = tgt_out[...,-1].to(torch.long)
         #Using spherical coordinates to get 3D direction vectors
         logits_cont = get_cartesian_from_angles(logits_cont)
         #special_tokens are not taken into account in the continuous loss
         #eos_bos_mask = ((tgt_out_tokens == vocab_charges.get_index(special_symbols["eos"]))
         #                + (tgt_out_tokens == vocab_charges.get_index(special_symbols["bos"]))) 
-        spe_tokens_mask = ~(tgt_out_tokens = special_symbols["sample"])
+        spe_tokens_mask = ~(tgt_out_tokens == special_symbols["sample"])
         #Computing the losses
         loss_charges = loss_fn_charges(logits_charges.transpose(dim0 = -2, dim1 = -1), tgt_out_charges)
         loss_pdg = loss_fn_pdg(logits_pdg.transpose(dim0 = -2, dim1 = -1), tgt_out_pdg)
@@ -432,7 +431,8 @@ def train_and_validate(config, args):
                                                                                               frac_files = config["frac_files"],
                                                                                               model_mode = "training",
                                                                                               preprocessed= config["preprocessed"],
-                                                                                              E_cut= config["E_cut"])
+                                                                                              E_cut= config["E_cut"],
+                                                                                              shuffle = config["shuffle"])
     torch.save(vocab_charges.vocab, config["dir_results"] + "vocab_charges.pt")
     torch.save(vocab_pdgs.vocab, config["dir_results"] + "vocab_PDGs.pt")
     
@@ -445,8 +445,8 @@ def train_and_validate(config, args):
     print(f"number of parameters: {nparams}")
     logging.info("Created model, computing logging frequencies...")
     optim = torch.optim.Adam(model.parameters(), lr = config["lr"])
-    loss_fn_charges = nn.CrossEntropyLoss(reduction ='none')
-    loss_fn_pdgs = nn.CrossEntropyLoss(reduction ='none')
+    loss_fn_charges = nn.CrossEntropyLoss(reduction ='mean')
+    loss_fn_pdgs = nn.CrossEntropyLoss(reduction ='mean')
     loss_fn_cont = nn.MSELoss(reduction = 'none')
     loss_fn_tokens = nn.CrossEntropyLoss(ignore_index= special_symbols["pad"], reduction= "mean")
 
@@ -542,10 +542,11 @@ def train_and_validate(config, args):
             logging.info("New best Model, saving...")
             torch.save(model.state_dict(), config["dir_results"] + "best_model.pt")
             val_loss_min = val_loss_min
-
+        logging.info("Saving current model...")
+        torch.save(model.state_dict(), config["dir_results"] + f"model_epoch_{i}")
         logging.info(f"{i + 1} epoch done, time: {time_epoch}, val_loss: {val_loss_epoch}, train_loss: {train_loss_epoch}")
     
-    torch.save(losses_evolution, config["dir_results"] + "losses.pt")
+        torch.save(losses_evolution, config["dir_results"] + f"losses_epoch_{i}.pt")
     logging.info("Finished all epochs and saved the losses")
 
 if __name__ == "__main__":

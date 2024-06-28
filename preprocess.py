@@ -5,7 +5,7 @@ import numpy as np
 dir_res  = "/data/suehara/mldata/pfa/ntau_10to100GeV_10/preprocessed"
 dir_train = "/data/suehara/mldata/pfa/ntau_10to100GeV_10/train"
 dir_val =  "/data/suehara/mldata/pfa/ntau_10to100GeV_10/validation"
-frac_files = 0.5
+frac_files = 0.6
 
 testing = False
 if testing:
@@ -18,7 +18,7 @@ if testing:
        # print(feats)
         pass
 else:
-    fracs = np.arange(6,11)/ 10
-    for frac_files in fracs:
-        train_val_preprocessing(dir_train, dir_val, dir_res, frac_files)
-        
+   # fracs = np.arange(6,11)/ 10
+   # for frac_files in fracs:
+   #     train_val_preprocessing(dir_train, dir_val, dir_res, frac_files)
+   train_val_preprocessing(dir_train, dir_val, dir_res, frac_files, 0.1)     
