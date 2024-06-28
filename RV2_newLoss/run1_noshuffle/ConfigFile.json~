@@ -36,5 +36,5 @@
     "ncluster_max": 100,
     "preprocessed": true,
     "E_cut": 0.1,
-    "shuffle": true
+    "shuffle": false
 }
