@@ -408,7 +408,9 @@ def train_and_validate(config, args):
     logging.getLogger().addHandler(console)
 
     logging.info("Getting the training data from" +config["dir_path_train"])
-    vocab_charges, vocab_pdgs, special_symbols, E_rms_normalizer, train_dl, val_dl = get_data((config["dir_path_train"], config["dir_path_val"]), config["batch_size"], config["frac_files"], "training")
+    vocab_charges, vocab_pdgs, special_symbols, E_rms_normalizer, train_dl, val_dl = get_data((config["dir_path_train"], config["dir_path_val"]),
+                                                                                              config["batch_size"], config["frac_files"], "training",
+                                                                                              E_cut = config["E_cut"], shuffle = config["shuffle"])
     torch.save(vocab_charges.vocab, config["dir_results"] + "vocab_charges.pt")
     torch.save(vocab_pdgs.vocab, config["dir_results"] + "vocab_PDGs.pt")
     

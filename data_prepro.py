@@ -140,7 +140,9 @@ class CollectionHitsTraining(Dataset):
                                     "sample": sample_cont}
             do_tracks: bool. If true, tracks are stored in the Dataset
             do_time: bool, if True, time of hits is kept'''
-    def __init__(self, dir_path: str, special_symbols: dict,frac_files: float,preprocessed: bool = False,do_tracks: bool = False, do_time: bool = False):
+    def __init__(self, dir_path: str, special_symbols: dict,frac_files: float,
+                 preprocessed: bool = False, E_cut: float = 0.1, do_tracks: bool = False,
+                 do_time: bool = False):
         if frac_files < 0 or frac_files > 1:
             raise ValueError("The fraction of files must lie inbetween 0 and 1")
 
@@ -166,6 +168,7 @@ class CollectionHitsTraining(Dataset):
             print("NEW VERSION")
             feats, labels = self._get_data(filenames, nfiles)
             print(frac_files)
+            self.E_cut = E_cut
             self.do_tracks = do_tracks
             #removing tracks
             if do_tracks is False:
@@ -286,6 +289,9 @@ class CollectionHitsTraining(Dataset):
         indices_features = [3,2,4,5,6,7] #3: charge 2: pdg, 4: mass, 5-7: momentum (mass to compute energy)
         #norm2_torch = labels_flat_torch[]
         labels = ak.unflatten(labels_flat_torch.numpy(), dim_count)[..., indices_features] #putting back to expected shape
+        #Discarding low energy clusters 
+        E_mask = labels[...,2] > self.E_cut
+        labels = labels[E_mask]
         indices_sort_E = ak.argsort(labels[...,2], axis = -1, ascending= False)
         return labels[indices_sort_E] #sorting by descending energy
 
@@ -309,7 +315,7 @@ class CollectionHitsTraining(Dataset):
         return self.feats[id1], self.labels[id1]
 
 
-def get_data(dir_path, batch_size, frac_files,model_mode:str, preprocessed: bool = False):
+def get_data(dir_path, batch_size, frac_files,model_mode:str, preprocessed: bool = False,E_cut: float = 0.1, shuffle: bool = False):
     special_symbols = {
             "pad": 0,
             "bos": 1,
@@ -319,8 +325,8 @@ def get_data(dir_path, batch_size, frac_files,model_mode:str, preprocessed: bool
     print(preprocessed)
     if model_mode == "training":
         dir_path_train, dir_path_val = dir_path
-        data_set_train = CollectionHitsTraining(dir_path_train,special_symbols, frac_files, preprocessed)
-        data_set_val = CollectionHitsTraining(dir_path_val, special_symbols, frac_files, preprocessed)
+        data_set_train = CollectionHitsTraining(dir_path_train,special_symbols, frac_files, preprocessed, E_cut)
+        data_set_val = CollectionHitsTraining(dir_path_val, special_symbols, frac_files, preprocessed, E_cut)
         vocab_charges, vocab_pdgs = data_set_train.vocab_charges, data_set_train.vocab_pdgs
         vocab_charges_val, vocab_pdgs_val = data_set_val.vocab_charges, data_set_val.vocab_pdgs
 
@@ -332,8 +338,8 @@ def get_data(dir_path, batch_size, frac_files,model_mode:str, preprocessed: bool
         E_label_RMSNormalizer = data_set_train.E_label_RMS_normalizer
         return (vocab_charges, vocab_pdgs,
                 special_symbols, E_label_RMSNormalizer, 
-                DataLoader(data_set_train, batch_size= batch_size),
-                DataLoader(data_set_val, batch_size= batch_size))    
+                DataLoader(data_set_train, batch_size= batch_size, shuffle = shuffle),
+                DataLoader(data_set_val, batch_size= batch_size, shuffle = shuffle))    
 
     elif model_mode == "inference":
         dir_path_inference = dir_path[0]
@@ -343,7 +349,7 @@ def get_data(dir_path, batch_size, frac_files,model_mode:str, preprocessed: bool
     else:
         raise ValueError(model_mode + " is an invalid entry. Must be either training or inference")    
 
-def train_val_preprocessing(dir_train, dir_val, dir_res, frac_files):
+def train_val_preprocessing(dir_train, dir_val, dir_res, frac_files, E_cut):
     special_symbols = {
             "pad": 0,
             "bos": 1,
@@ -351,16 +357,16 @@ def train_val_preprocessing(dir_train, dir_val, dir_res, frac_files):
             "sample": 3
     }
     start = time()
-    preprocessing(dir_train, dir_res, "training",special_symbols, frac_files)
+    preprocessing(dir_train, dir_res, "training",special_symbols, frac_files, E_cut)
     dt_train = time() - start
     start = time()
-    preprocessing(dir_val, dir_res, "validation",special_symbols, frac_files)
+    preprocessing(dir_val, dir_res, "validation",special_symbols, frac_files, E_cut)
     dt_val = time() - start
     print(f"time for training: {dt_train} sec, time for validation: {dt_val} sec")
     
-def preprocessing(dir_data, dir_res, datatype: str, special_symbols, frac_files):
+def preprocessing(dir_data, dir_res, datatype: str, special_symbols, frac_files, E_cut):
     start = time()
-    ds = CollectionHitsTraining(dir_data, special_symbols,frac_files)
+    ds = CollectionHitsTraining(dir_data, special_symbols,frac_files, False,E_cut)
     end = time() - start
     print(f"time needed to make preprocessing: {end} sec")
     E_label_normalizer = ds.E_label_RMS_normalizer
