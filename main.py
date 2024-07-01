@@ -36,7 +36,8 @@ def translate_E(logits_cont, rms_normalizer):
         E = logits_cont
     else:
         E = logits_cont[...,0]
-    return torch.pow(10,rms_normalizer.inverse_normalize(E))
+    rms_normalizer.inverse_normalize(E)
+    return torch.pow(10,E)
 
 def translate(input, vocab_charges, vocab_pdgs, rms_normalizer):
     input[...,0] = vocab_charges.indices_to_tokens(input[...,0])
@@ -133,7 +134,7 @@ def greedy_func(model,src,vocab_charges, ncluster_max: int, special_symbols: dic
         #Creating <bos> token
         bos_np = np.array([0]*nfeats_labels + [special_symbols["bos"]])
         bos = torch.from_numpy(bos_np).to(device = DEVICE, dtype = dtype)
-        
+    
         eos_cont_tensor = torch.tensor(special_symbols["eos"], device = DEVICE)
         bos_cont_tensor = torch.tensor(special_symbols["bos"], device = DEVICE)
         sample_cont_tensor = torch.tensor(special_symbols["sample"], device = DEVICE)
@@ -171,7 +172,7 @@ def greedy_func(model,src,vocab_charges, ncluster_max: int, special_symbols: dic
             new_sample_tokens_batch = ~new_eos_tokens_batch * ~new_bos_tokens_batch
             #Using spherical coordinates to get 3D direction vectors
             next_DOF_cont_batch = get_cartesian_from_angles(next_DOF_cont_batch)
-            next_DOF_cont_batch_spe = torch.zeros((batch_size, next_DOF_cont_batch.shape[-1] + 2), device = DEVICE, dtype = dtype)
+            next_DOF_cont_batch_spe = torch.zeros((batch_size, next_DOF_cont_batch.shape[-1] + 1), device = DEVICE, dtype = dtype)
             n_new_eos = torch.count_nonzero(new_eos_tokens_batch)
             if  n_new_eos> 0:
                 is_done[~is_done_prev] = new_eos_tokens_batch[~is_done_prev.squeeze(-1)]
@@ -225,7 +226,8 @@ def inference(config, args):
     model = create_model(config, args.model, len(vocab_charges), len(vocab_pdgs))
 
     #Loading weights
-    model.load_state_dict(torch.load(config["dir_model"] + "best_model.pt"))
+    #model.load_state_dict(torch.load(config["dir_model"] + "best_model.pt"))
+    model.load_state_dict(torch.load(config["dir_model"] + "model_epoch_0"))
     model.eval()
     logging.info(f"Model created on {model.device}, now loading the source")
 
@@ -236,7 +238,7 @@ def inference(config, args):
     special_symbols, E_label_RMS_normalizer, src_loader = get_data((config["dir_path_inference"], ), 
                                                                     config["batch_size_test"], 
                                                                     config["frac_files_test"], "inference", 
-                                                                    config["preprocessed"], config["E_cut"], config["shuffle"])
+                                                                    False, config["E_cut"], config["shuffle"])
     logging.info("Saving normalizer...")
     torch.save(E_label_RMS_normalizer, config["dir_results"] + "E_RMS_normalizer.pt")
     logging.info("Going to inference now")
@@ -244,7 +246,7 @@ def inference(config, args):
     labels = []
     for src, tgt in src_loader:
         start_time = time()
-        clusters_out = greedy_func(model, src,vocab_charges,config["ncluster_max"],special_symbols,config["d_input_decoder"] -2, dtype).to("cpu")
+        clusters_out = greedy_func(model, src,vocab_charges,config["ncluster_max"],special_symbols,config["d_input_decoder"] -1, dtype).to("cpu")
         #print(clusters_out.device)
         translate(clusters_out, vocab_charges, vocab_pdgs,E_label_RMS_normalizer)
         pred.append(clusters_out)

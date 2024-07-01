@@ -1,6 +1,6 @@
 {
     "inference": true,
-    "dir_results": "./RV2_newLoss/modelV1/",
+    "dir_results": "./RV2_newLoss/modelV1/epoch_0_res",
     "dir_model": "./RV2_newLoss/modelV1/",
     "dir_path_inference": "/data/suehara/mldata/pfa/ntau_10to100GeV_10/test",
     "path_charges": "./RV2_newLoss/modelV1/",

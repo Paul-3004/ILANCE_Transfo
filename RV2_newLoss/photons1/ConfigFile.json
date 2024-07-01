@@ -1,8 +1,8 @@
 {
     "inference": true,
-    "dir_results": "./RV2_newLoss/photons1/",
+    "dir_results": "./RV2_newLoss/photons1/epoch_30_res",
     "dir_model": "./RV2_newLoss/photons1/",
-    "dir_path_inference": "/data/suehara/mldata/pfa/ntau_10to100GeV_10/test",
+    "dir_path_inference": "/data/suehara/mldata/pfa/tg_10GeV_100mrad",
     "path_charges": "./RV2_newLoss/photons1/",
     "path_PDGs": "./RV2_newLoss/photons1/",
     "dir_path_train":  "/data/suehara/mldata/pfa/tg_10GeV_100mrad/",
