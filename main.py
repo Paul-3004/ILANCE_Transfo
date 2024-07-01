@@ -47,7 +47,7 @@ def create_model(config, version, vcharges_size, vpdgs_size):
     if config["dtype"] == "torch.float32":
         dtype = torch.float32
     
-    version = args.model
+    #version = args.model
     if version == 1:
         decoder = None
     elif version == 2:
@@ -156,14 +156,18 @@ def greedy_func(model,src,vocab_charges, ncluster_max: int, special_symbols: dic
             logits_charges_batch = model.lastlin_charge(out_decoder)[:,-1] #shape is [N,T,F]
             logits_pdg_batch = model.lastlin_pdg(out_decoder)[:,-1]
             next_DOF_cont_batch = model.lastlin_cont(out_decoder)[:,-1]
+            logits_tokens_batch = model.lastlin_tokens(out_decoder)[:,-1]
         
             #no need to apply softmax since it's a bijection, and no need to print probabilities
             next_charges_batch = torch.argmax(logits_charges_batch, dim = 1, keepdim = True) #class id same as index by construction
             next_pdgs_batch = torch.argmax(logits_pdg_batch, dim = 1, keepdim = True) #class id same as index by construction
+            next_tokens_batch = torch.argmax(logits_tokens_batch, dim = 1, keepdim = True)
             
             #Addding special tokens of cont. DOF, ignoring the values if event has already <eos>
-            new_eos_tokens_batch = ( (next_charges_batch == vocab_charges.get_index(special_symbols["eos"]["CEL"])) * ~is_done_prev).squeeze(-1)
-            new_bos_tokens_batch = ( (next_charges_batch == vocab_charges.get_index(special_symbols["bos"]["CEL"])) * ~is_done_prev).squeeze(-1)
+            #new_eos_tokens_batch = ( (next_charges_batch == vocab_charges.get_index(special_symbols["eos"]["CEL"])) * ~is_done_prev).squeeze(-1)
+            new_eos_tokens_batch = ( (next_tokens_batch == special_symbols["eos"]) * ~is_done_prev).squeeze(-1)
+            #new_bos_tokens_batch = ( (next_charges_batch == vocab_charges.get_index(special_symbols["bos"]["CEL"])) * ~is_done_prev).squeeze(-1)
+            new_bos_tokens_batch = ( (next_tokens_batch == special_symbols["bos"]) * ~is_done_prev).squeeze(-1)
             new_sample_tokens_batch = ~new_eos_tokens_batch * ~new_bos_tokens_batch
             #Using spherical coordinates to get 3D direction vectors
             next_DOF_cont_batch = get_cartesian_from_angles(next_DOF_cont_batch)
