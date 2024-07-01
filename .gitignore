@@ -1,8 +1,8 @@
-Results/*/best_model.pt
 Results/*/best_model1.pt
 testing.ipynb
 Analysis
-Results/*/Graphs
-ResultsV2/*/Graphs
+*/*/Graphs
 Comparisons
 ResultsV2/*/best_model.pt
+*/*/model_epoch_*
+*/*/best_model.pt
