@@ -227,7 +227,7 @@ def inference(config, args):
 
     #Loading weights
     #model.load_state_dict(torch.load(config["dir_model"] + "best_model.pt"))
-    model.load_state_dict(torch.load(config["dir_model"] + "model_epoch_0"))
+    model.load_state_dict(torch.load(config["dir_model"] + "model_epoch_29"))
     model.eval()
     logging.info(f"Model created on {model.device}, now loading the source")
 
