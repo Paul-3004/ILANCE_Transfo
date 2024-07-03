@@ -296,7 +296,6 @@ class CollectionHitsTraining(Dataset):
         self.E_cut = np.log10(self.E_cut)
         self.E_cut -= self.E_label_RMS_normalizer.mean
         self.E_cut /= self.E_label_RMS_normalizer.RMS
-        print(self.E_cut)
         E_mask = labels[...,2] > self.E_cut.item()
         labels = labels[E_mask]
         indices_sort_E = ak.argsort(labels[...,2], axis = -1, ascending= False)
