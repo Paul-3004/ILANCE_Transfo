@@ -11,10 +11,10 @@ Several branches exist for this project and contain different network architectu
 
 # Documentation
 - For any questions related to Pytorch's API or awkward library please refer to their corresponding documentation on [Pytorch's API](https://pytorch.org) and [Awkward Library](https://awkward-array.org/doc/main/)
-- Some key methods/functions algorithm are explained in [Key Algorithms](docs/key_algorithms.md)
-- More information on the original transformer architecture as well as the variants implemented can be found in [Network architectures](docs/NetworkArchitectures.md)
-- More information on the datasets used as well as their preprocessing can be found in [Datasets and Preprocessing](docs/dataset_preprocessing.md)
-- Results and performances of the models can be found in [Results](docs/results.md)
+- Some key methods/functions algorithm are explained in [Key Algorithms](docs/KeyAlgorithms.md)
+- More information on the original transformer architecture as well as the variants implemented can be found in [Network Architectures](docs/NetworkArchitectures.md)
+- More information on the datasets used as well as their preprocessing can be found in [Datasets and Preprocessing](docs/DatasetsPreprocessing.md)
+- Results and performances of the models can be found in [Results](docs/Results.md)
 
 
 
