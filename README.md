@@ -5,7 +5,7 @@ The project is built on Pytorch's API to build and train the models as well as t
 
 # Description of the branches
 Several branches exist for this project and contain different network architectures and/or different training methods. 
-- `version_1`  is the first model implemented and follows the transformer's original architecture
+- `main`  is the first model implemented and follows the transformer's original architecture
 - `dev_MMHA` is a second implementation whith a slight modification to the architecture as described in [Network architectures](docs/NetworkArchitectures.md)
 - `new_loss` reuses the same architecture as 'dev_MMHA' but implements a new loss function specialised to predict the next token's kind (`<bos>`, `<eos>`, `<sample>`, `<hits>`). This implies mandatory changes on the features of both hits and labels. The labels are also sorted by decreasing energy and a threshold is applied, discarding low energy clusters. 
 
