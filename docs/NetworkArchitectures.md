@@ -107,5 +107,59 @@ This process is concretely illustrated on Fig. 5. During inference, the sentence
 
 During training, thanks to the masked MHA layer, a token from the decoder's output at position $i$ can be considered as the last token of a sentence of length $i$ and used to predict the $i+1$ token. Thus, the last linear and softmax transformations are applied to all tokens forming the decoder's output. The result is a matrix of dimension $(n+1) \times l_{voc}$ where the element at $(i,\,j)$ is the probability that the token at position $i+1$ and associated to $j$ in the vocabulary is next. This output can be directly compared, using an appropriate loss function, with the vocabulary version of the translated sentence to which was added an `<eos>` token.
 
+## Transformer as PFA: Version 1
+> **NOTE:**
+> - As several notions presented in the [Preprocessing of the dataset](DatasetsPreprocessing.md), it is advised to first read it first before continuing.
+> - Tokens corresponding to hits or labels will be referred to as sample to contrast with special tokens reserved for `<pad>`, `<bos>`, and `<eos>`.
+
+The transformer should take as input hits from the calorimeters, whose features are their energies and positions, to predict the associated cluster, characterised by the particle's charge, PDG, energy and direction. This implies changes to the preprocessing of the data and to the transformation applied to the decoder's output, compared to the original architecture. Summarised, these are:
+
+- Addition of 2 binary features to both hits and labels to distinguish between samples and labels.
+- Implementation of two plain Feed Forward Networks as embedders for the hits and labels.
+- Decoder's output undergoes three different linear transformations in parralell to
+    - Produce probabilities for the next charge
+    - Produce probabilities for the next PDG
+    - Produce the values for the continuous degrees of freeedom (DOFs)
+
+The rest of the modifications follow as consequences of the above considerations and are presented in the following sections. Since choices regarding data preprocessing are motivated by the Network final output, the transformations to the decoder's output as well as the different workflows during training and inference will be presented first in [Producing the outputs](#producing-the-outputs). How input feats and labels are handled before going through the transformer follows in [Data preprocessing](#data-preprocessing).
+
+
+### Data preprocessing
+To distinguish between samples and special tokens, this first implementation gives samples two additional binary features, encoded as follows:
+ - (0,0) is associated to `<sample>`
+ - (0,1) is associated to `<pad>`
+ - (1,0) is associated to `<eos>`
+ - (1,1) is associated to `<bos>`
+
+Furthermore, as stated above, the transformer will need to output predictions for the next charge, PDG, and cluster continuous DOFs. Anticipating on the presentation of the training and validation workflow, the transformer output will be compared to the labels using three loss functions:
+
+- 1 Mean Square Error (MSE) for the continuous DOFs.
+- 2 Cross Entropy for the charge and PDGs.
+
+In other words, the continous DOFs are treated as a linear regression problem, whereas charges and PDGs as classification problems. For the latter case, this is similar to machine translation and can be dealt with by constructing two vocabularies: one for the charges and one for the PDGs. As in machine translation, these vocabularies will associate each charge and PDG value to a unique integer, as well as creating entries for special tokens. For both vocabularies, the correspondance between the special tokens and their unique integer, referred to as indices, is constructed as:
+
+ - -150 $\leftrightarrow$ 0 for `<pad>`
+ - -100 $\leftrightarrow$ 1 for `<bos>`
+ - -50 $\leftrightarrow$ 2 for `<eos>`
+   
+In the following, the values (-150, -100, -50) will be referred to as dummy values to distinguish them from the physical values corresponding to the samples' charges or PDGs. The only requirement that those dummy values need to satisfy is being negative, and for the charges smaller than -1, so that they will not be confused with physical values. 
+
+> **NOTE:**
+> Recall that for the PDGs, the feature actually corresponds to the absolute value of the PDG.
+
+The rest of the vocabularies is created by sorting in ascending order the unique values of charges and PDGs found in the dataset and associating them to the integer starting from 2 onwards. This conversion from integer values to integer values might seems useless at first but is a requirement to fully exploit Pytorch's [Cross Entropy loss](https://pytorch.org/docs/stable/generated/torch.nn.CrossEntropyLoss.html). Indeed, when initializing the loss function, it is possible to specify an index which will be ignored when computing the loss. This is particularly useful to avoid taking into account padding tokens in the loss. This loss function can take as input unnormalized probabilities (i.e. before softmax is applied) and compare it with the labels' indices for each position. T
+
+Now,  function can take as input unnormalized probabilities (i.e. before softmax is applied) and compare it with the labels' classes. There is also the possibility to ignore specific input entries, corresponding to a specified token given as argument when initialising the loss function. This requires the labels' indi to 
+
+
+
+### Producing the outputs
+The decoder outputs an embedding matrix of dimension $(n+1)\times d_{model}$. From these, three kind of information need to be retrieved:
+1. Probabilities for the next charge
+2. Probabilities for the next PDG
+3. Values of the next cluster's energy and direction
+
+Thus, the decoder's output undergoes three different linear transformations to produce the logits corresponding to the three categories above. 
+
 
 
