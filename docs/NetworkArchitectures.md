@@ -111,6 +111,7 @@ During training, thanks to the masked MHA layer, a token from the decoder's outp
 > **NOTE:**
 > - As several notions presented in the [Preprocessing of the dataset](DatasetsPreprocessing.md), it is advised to first read it first before continuing.
 > - Tokens corresponding to hits or labels will be referred to as sample to contrast with special tokens reserved for `<pad>`, `<bos>`, and `<eos>`.
+> - This version, as described below, is the one implemented in the branch `main`
 
 The transformer should take as input hits from the calorimeters, whose features are their energies and positions, to predict the associated cluster, characterised by the particle's charge, PDG, energy and direction. This implies changes to the preprocessing of the data and to the transformation applied to the decoder's output, compared to the original architecture. Summarised, these are:
 
@@ -131,7 +132,7 @@ To distinguish between samples and special tokens, this first implementation giv
  - (1,0) is associated to `<eos>`
  - (1,1) is associated to `<bos>`
 
-Furthermore, as stated above, the transformer will need to output predictions for the next charge, PDG, and cluster continuous DOFs. Anticipating on the presentation of the training and validation workflow, the transformer output will be compared to the labels using three loss functions:
+Furthermore, as stated above, the transformer will need to output predictions for the next charge, PDG, and the cluster's continuous DOFs. Anticipating on the presentation of the training and validation workflow, the transformer output will be compared to the labels using three loss functions:
 
 - 1 Mean Square Error (MSE) for the continuous DOFs.
 - 2 Cross Entropy for the charge and PDGs.
@@ -142,16 +143,35 @@ In other words, the continous DOFs are treated as a linear regression problem, w
  - -100 $\leftrightarrow$ 1 for `<bos>`
  - -50 $\leftrightarrow$ 2 for `<eos>`
    
-In the following, the values (-150, -100, -50) will be referred to as dummy values to distinguish them from the physical values corresponding to the samples' charges or PDGs. The only requirement that those dummy values need to satisfy is being negative, and for the charges smaller than -1, so that they will not be confused with physical values. 
+In the following, the values (-150, -100, -50) will be referred to as dummy values to distinguish them from the physical values corresponding to the samples' charges or PDGs. The only requirement that those dummy values need to satisfy is being negative, and for the charges, smaller than -1, so that they will not be confused with physical values. 
 
 > **NOTE:**
 > Recall that for the PDGs, the feature actually corresponds to the absolute value of the PDG.
 
-The rest of the vocabularies is created by sorting in ascending order the unique values of charges and PDGs found in the dataset and associating them to the integer starting from 2 onwards. This conversion from integer values to integer values might seems useless at first but is a requirement to fully exploit Pytorch's [Cross Entropy loss](https://pytorch.org/docs/stable/generated/torch.nn.CrossEntropyLoss.html). Indeed, when initializing the loss function, it is possible to specify an index which will be ignored when computing the loss. This is particularly useful to avoid taking into account padding tokens in the loss. This loss function can take as input unnormalized probabilities (i.e. before softmax is applied) and compare it with the labels' indices for each position. T
+The rest of the vocabularies is created by sorting in ascending order the unique values of charges and PDGs found in the dataset and associating them to integers starting from 3 onwards. This conversion from integer values to integer values might seem useless at first but is a requirement to fully exploit Pytorch's [Cross Entropy loss](https://pytorch.org/docs/stable/generated/torch.nn.CrossEntropyLoss.html). Indeed, when initializing the loss function, it is possible to specify an index which will be ignored when computing the loss. This is particularly useful to avoid taking into account padding tokens in the loss. This loss function can take as input unnormalized probabilities (i.e. before softmax is applied) and compare it with the labels' indices for each token. In order for the specified index to be ignored, the class' indices must be correspond to their position in the probabilities vector. Thus, since the index $0$ corresponds to a padding token, the probability at entry 0, correpsonds to the probability of the next token being a padding token and will be ignored. 
 
-Now,  function can take as input unnormalized probabilities (i.e. before softmax is applied) and compare it with the labels' classes. There is also the possibility to ignore specific input entries, corresponding to a specified token given as argument when initialising the loss function. This requires the labels' indi to 
+From these considerations, the preprocesing of the feats follows:
+1. Normalisation of energies and positions as described in [Datasets & Preprocessing](DatasetsPreprocessing.md)
+2. Addition of $(0,0)$ at the end of each hit
+3. Addition of `<eos>`, `<bos>` and `<pad>`, constructed by concatenation of a 4D zero vector and their correponding binary encoding.
 
+On the other hand, the preprocessing of the labels follows:
+1. Normalisation of energies and positions
+2. Addition of $(0,0)$ at the end of each cluster
+3. Addition of `<eos>`, `<bos>` and `<pad>`, constructed by first
+    1. concatenation of a 6D zero vector and their correponding binary encoding.
+    2. Modification of entries 0 and 1 to their corresponding dummy indices, e.g.
+       $$\textrm{pad} = (-150, -150,0,0,0,0,0,1) \textrm{, bos} = (-100, -100 ,0,0,0,0,1,0) \textrm{ and bos} = (-50,-50,0,0,0,0,1,1)$$
+4. Translation of the dummy and physical values to their corresponding indices by the charge and PDGs vocabularies.
 
+Once these steps are executed, both feats and labels go through their corresponding Embedders.
+
+### Embedders
+Although in machine translation the embedders for the encoder's input can be the same as for the decoder's, it is not possible in this case, since processed feats and labels do not have the same dimensions, nor contain the same kind of information. Therefore, two embedders are created as two different instances of the same `Embedder` class. 
+
+The `Embedder` class implements a plain Feed-Forward Network with variable number of layers, chosen by the user. At each layer, ReLU is used as an activation function. For the feats, the first layer corresponds to a linear transfomration from $\mathbb{R}^{6} \to $\mathbb{R}^{d_{model}}$. All the other layers have transformations from $\mathbb{R}^{d_{model}} \to \mathbb{R}^{d_{model}}$. The labels embedder has a similar structure, except that the first transformation is a map from $\mathbb{R}^{8}\to \mathbb{R}^{d_{model}}$. 
+
+Once feats and labels went through their associated embedders, they are sent to the encoder and decoder respectively.
 
 ### Producing the outputs
 The decoder outputs an embedding matrix of dimension $(n+1)\times d_{model}$. From these, three kind of information need to be retrieved:
@@ -159,7 +179,59 @@ The decoder outputs an embedding matrix of dimension $(n+1)\times d_{model}$. Fr
 2. Probabilities for the next PDG
 3. Values of the next cluster's energy and direction
 
-Thus, the decoder's output undergoes three different linear transformations to produce the logits corresponding to the three categories above. 
+Thus, the decoder's output undergoes three different linear transformations, $f_C$, $f_P$, $f_E$, to produce the logits corresponding to the charge, PDG and continous DOFs respectively. For $f_C$ and $f_P$, their outputs is interpreted as the unnormalized probabilities that the indice $i$ is the next token, such that $f_C: \mathbb{R}^{d_{model}}\to \mathbb{R}^{l_C}$ and $f_P: \mathbb{R}^{d_{model}}\to \mathbb{R}^{l_P}$, where $l_{C/P}$ are the lengths of the charge/PDGs vocabularies. Both loss functions are initialised as Pytorch's CrossEntropyLoss, ignoring the padding tokens. 
 
+As the vector for the cluster direction should be normalized to 1, $f_E$ is defined as map $f_E: \mathbb{R}^{d_{model}}\to \mathbb{R}^{3}$, with the first entry of its output interpreted as the (normalised) log base 10 of the energy, and the two others as $\theta$ and $\phi$
+respectively. In order to avoid problems from the non-periodicity of the MSE loss function, these angles are converted to 3D cartesian coordinates, which are then compared to the ground truth. Moreover, since there is no direct way of ignoring entries in Pytorch's [MSE Loss](https://pytorch.org/docs/stable/generated/torch.nn.MSELoss.html) function, this is done by applying a mask to the predictions and ground truth, selecting only positions for which the ground truth is not a padding token.
 
+> **NOTE:**
+> Indeed, if the predicted angles are (0.01, 359.78) with a ground truth being $(0,0)$, the MSE loss function will strongly penalize this prediction.
 
+During inference, it is still necessary to decide which kind of token was predicted. In this first version, this is based exclusively on the prediction of the charge tokens.
+> **NOTE:**
+> This is an arbitrary choice
+
+Thus, if the entry with the highest probability in the charges logits is correspond to an `<eos>` token, the inference will be stopped. Note that padding token cannot be predicted since they do not appear in the loss function by construction. If the charge index corresponds to another token, the inference process continues after the additional features [(0,0), (0,1), ...] were added to the newly formed cluster. Again, which of those binary encoding is added depend solely on the token predicted by the charge output. 
+
+## Transformer as PFA: Version 2
+>**NOTE:**
+>This version, as described below, is the one implemented in the branch `dev_MMHA`
+
+This version tries to address the potential problem of finding a common embedding space between feats and labels. The main differences with the first version are:
+- Changes to the dimensions of the embedder's hidden layers
+- Implementation of a custom decoder architecture in the transformer
+
+### Embedders
+Those changes are mainly motivated by examples of embedders found in the literature. If the embedder consists of more than one layer, the first layer is changed from being a map from $\mathbb{R}^{n} \to \mathbb{R}^{d_{model}}$, to a map $\mathbb{R}^{n} \to \mathbb{R}^{d_{ff}}$, where $d_{ff}$ is a hyperparameter, usually chosen as $2d_{model}$. As before, the following layers are maps from $\mathbb{R}^{d_{ff}} \to \mathbb{R}^{d_{ff}}$, except for the last one, for which it has to be $\mathbb{R}^{d_{ff}} \to \mathbb{R}^{d_{out}}$. Note that for reasons that will become clear in the next section, $d_{out}$ can now be different for feats embedder and the labels. 
+
+### Custom decoder 
+The main motivation behind the changes and the architecture is to give the possibility to the model to store more information in the labels' embedding than the hits' whilst still being able be compared to hits. This train of thoughts takes its origin in two reasons:
+1. Labels contains more information than hits, since it also adds the charges and PDGs. It seems thus natural that their embedding should be larger.
+2. Since labels and hits do not contain the same type of information, maybe it is more difficult to create to embedding spaces where the dot products between the memory's keys and labels' queries is relevant. Projecting the input labels into different subspaces allows to give more freedom to the model to adapt if needed.
+
+This is achieved by feeding the decoder a higher dimensional embedding of the labels than the feats, and then projecting them on $n$ different vectors, such that $d_{labels} / n = d_{feats}$, where $d_{labels}$ is the dimension of the labels embedding (set by the $d_{out}$ of the labels embedder described above) and $d_{feats}$ the dimension of the feats embedding. The results are $n$ $(N \times n_{samples} \times d_{feats})$ "sub-embedding" matrices, with $N$ the number of events and $n_{samples}$ the number of tokens per event.
+> **NOTE:**
+> Recall that both feats and labels embedding matrices were padded such that $n_{samples}$ for feats and labels is the same for each event.
+
+Each individual sub-embedding matrix will then go through a usual single layer decoder, and compared with the memory. The $n$ resulting outputs are then concatenated back together again, followed by an Add & Norm layer, a one hidden layer Feed-Forward layer, and a last Add & Norm layer. This is more clearly illustrated on the Figure below, where for simplicity $n = 2$. Note also that the dimension of the FFN hidden layer is a hyperparameter and was chosen here to be $2d_{labels}$.
+|![CustomDecoder](https://github.com/Paul-3004/ILANCE_Transfo/assets/77359118/ec66ecd9-4e8a-4fed-a11a-e71eedb0c134)|
+|:---:|
+|Figure 5: Custom decoder layer. Note that the link between the decoders and memory is not shown on the diagramm.|
+
+## Other changes
+What follows is a list of different changes, for some not directly related to the model architecture but that can easily be implemented. All of those were implemented in the branch `new_loss`.
+
+- In the data preprocessing, cluster are sorted by decreasing energy.
+- In the data preprocessing, cluster having an energy lower than a fixed threshold are discarded (usually 0.1 GeV)
+- Optimization of the data preprocessing, in terms of memory usage and time efficiency.
+- Implementation of a new loss function, specialised in predicting the kind of tokens.
+
+### Implementing a new loss function
+In the previous implementations, the additional features indicating the kind of tokens were redundant information for the labels, since this information was also given in both the PDGs and charges indices. To remedy to this redundancy as well as building a more coherent network, this information was removed from the charges and PDGs, and a new loss function was implemented, specialising in predicting the next token's kind. This implies the following changes:
+- Since predicting a 2 dimensional encoding is difficult, it was changed to 4 integers ranging from 0 to 3, such that 0 is associated with `<pad>`, 1 to `<bos>`, 2 to `<eos>` and 3 `<sample>`.
+- To keep the functionality of the CrossEntropyLoss to ignore padding tokens, the charges and PDGs vocabularies special tokens were reduced to a unique entry in the dictionnary, corresponding to a special token with dummy value of -50 and index of 0. The rest of the vocabularies are constructed the same way. After preprocessing, but before charges and PDGs translation, the special tokens for the labels are:
+  $$\textrm{pad} = (-50,-50,0,0,0,0,0), \textrm{ bos} =  (-50,-50,0,0,0,0,1), \textrm{and eos} = (-50,-50,0,0,0,0,2)$$
+This ensures that the corresponding loss functions will take into account only entries corresponding to sampels and not special symbols, reserved to the new loss function. 
+- The output of the (custom) decoder is now split into 4 by an additional linear transformation from $\mathbb{R}^{d_{labels}} \to \mathbb{R}^{4}$.
+
+Those changes are implemented in the file data_prepro.py. 
