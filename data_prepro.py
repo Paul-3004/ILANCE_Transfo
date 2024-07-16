@@ -11,6 +11,7 @@ from time import time
     args:
         src: source, i.e., input to encoder, shape: (N,S,E)
         tgt: target, i.e., input to decoder, shape: (T,S,E)
+        tracks: tracks, optional
         pad_symbol: unique identifier for padding tokens
     output:
         src_padding_mask: mask for the source padding tokens, shape: (N,S)
@@ -19,7 +20,7 @@ def create_mask(src, tgt, pad_symbol, device):
     pad_symbol_broad = torch.tensor(pad_symbol).unsqueeze(0).unsqueeze(0).to(device)
     src_padding_mask = src[...,-1] == pad_symbol_broad
     tgt_padding_mask = tgt[...,-1] == pad_symbol_broad
-
+    
     return src_padding_mask, tgt_padding_mask
 
 '''Callable object to add special tokens to dataset.
@@ -174,9 +175,16 @@ class CollectionHitsTraining(Dataset):
             self.E_cut = E_cut
             self.do_tracks = do_tracks
             #removing tracks
+            hits_mask = ~(feats[:,:,5] == 1)
             if do_tracks is False:
-                hits_mask = ~(feats[:,:,5] == 1)
                 feats = feats[hits_mask]
+                labels = labels[hits_mask]
+            else:
+                #splitting tracks and hits
+                tracks_feats = feats[~hits_mask] 
+                feats = feats[hits_mask]
+                self.format_tracks(tracks_feats, special_symbols)
+                #no need for tracks in the labels
                 labels = labels[hits_mask]
             #keeping time
             if do_time:
@@ -309,7 +317,36 @@ class CollectionHitsTraining(Dataset):
         self.RMS_normalize(feats_flat_torch[...,-3:], "pos")
         return ak.unflatten(feats_flat_np, counts = dim)
 
-
+    def format_tracks(self, tracks, special_symbols):
+        '''
+        Formats the tracks.
+            args:
+                tracks: raw tracks from ak.Array. 
+                        features are (Charge, px, py, pz)
+            
+            return: 
+                formatted tracks
+            
+            Algo:
+            1. Momentum is normalised to 1
+            2. Identifying feature is added:
+                1 for real tracks
+                0 for padding
+            3. Adds padding for each event, with target max number of tracks in all events + 1
+        '''
+        pnorm_tracks = np.sqrt(ak.sum(np.square(tracks[...,-3:]), axis = -1))
+        tracks_norm = tracks[...,-4:] / pnorm_tracks #only keep (C, px, py, pz)
+        one = np.ones((1,1,1))
+        tracks_norm = ak.concatenate((tracks_norm, one), axis = -1)
+        nfeats = int(ak.num(tracks_norm, axis = -1)[0])
+        ntracks_max = int(ak.max(ak.num(tracks_norm, axis = 0)))
+        target = ntracks_max + 1 #in case ntracks_max = 0, at least there's one pad 
+        pad = np.zeros(nfeats)
+        pad[-1] = special_symbols["pad"]
+        tracks_feats_none = ak.pad_none(tracks_norm, target = target, axis = 1, clip = True)
+        tracks_feats_padded = ak.fill_none(tracks_feats_none, pad, axis = None)
+        self.tracks_feats = torch.from_numpy(ak.to_numpy(tracks_feats_padded))
+        
     #necessary methods to override
     #called when applying len(), must be an integer (note: same numbers of feats than label)
     def __len__(self):
@@ -318,10 +355,13 @@ class CollectionHitsTraining(Dataset):
     #the sample is the list of hits for 1 event, same for labels 
     #called when indexing the dataset
     def __getitem__(self,id1):
-        return self.feats[id1], self.labels[id1]
+        if self.do_tracks:
+            return self.feats[id1], self.labels[id1], self.tracks_feats[id1]
+        else:
+            return self.feats[id1], self.labels[id1]
 
 
-def get_data(dir_path, batch_size, frac_files,model_mode:str, preprocessed: bool = False, E_cut: float = 0.1, shuffle: bool = False):
+def get_data(dir_path, batch_size, frac_files,model_mode:str, preprocessed: bool = False, E_cut: float = 0.1, shuffle: bool = False, do_tracks: bool = False):
     special_symbols = {
             "pad": 0,
             "bos": 1,
@@ -331,8 +371,8 @@ def get_data(dir_path, batch_size, frac_files,model_mode:str, preprocessed: bool
     print(preprocessed)
     if model_mode == "training":
         dir_path_train, dir_path_val = dir_path
-        data_set_train = CollectionHitsTraining(dir_path_train,special_symbols, frac_files, preprocessed, E_cut)
-        data_set_val = CollectionHitsTraining(dir_path_val, special_symbols, frac_files, preprocessed, E_cut)
+        data_set_train = CollectionHitsTraining(dir_path_train,special_symbols, frac_files, preprocessed, E_cut, do_tracks)
+        data_set_val = CollectionHitsTraining(dir_path_val, special_symbols, frac_files, preprocessed, E_cut, do_tracks)
         vocab_charges, vocab_pdgs = data_set_train.vocab_charges, data_set_train.vocab_pdgs
         vocab_charges_val, vocab_pdgs_val = data_set_val.vocab_charges, data_set_val.vocab_pdgs
 
@@ -349,7 +389,7 @@ def get_data(dir_path, batch_size, frac_files,model_mode:str, preprocessed: bool
 
     elif model_mode == "inference":
         dir_path_inference = dir_path[0]
-        data_set = CollectionHitsTraining(dir_path_inference, special_symbols, frac_files, preprocessed)
+        data_set = CollectionHitsTraining(dir_path_inference, special_symbols, frac_files, preprocessed, do_tracks)
         E_label_RMSNormalizer = data_set.E_label_RMS_normalizer
         return special_symbols, E_label_RMSNormalizer, DataLoader(data_set, batch_size = batch_size)
     else:

@@ -48,47 +48,8 @@ def translate(input, vocab_charges, vocab_pdgs, rms_normalizer):
 def create_model(config, version, vcharges_size, vpdgs_size):
     if config["dtype"] == "torch.float32":
         dtype = torch.float32
-    
-    #version = args.model
-    if version == 1 or version == 2
-        if version == 1:
-            decoder = None
-        elif version == 2:
-            decoder_layer = CustomDecoderLayer(d_label = config["d_out_embedder_tgt"], 
-                                               d_proj = config["d_out_embedder_src"],
-                                               nproj = config["nproj"],
-                                               nhead = config["nhead"],
-                                               dim_ff_sub = config["dim_ff_sub_decoder"],
-                                               dim_ff_main = config["dim_ff_main_decoder"],
-                                               batch_first= True,
-                                               norm_first= config["norm_first"],
-                                               dtype = dtype,
-                                               device = DEVICE)
-            decoder = CustomDecoder(decoder_layer, config["nlayers_decoder"])
 
-        #Creating model
-        model = ClustersFinder(
-            dmodel = config["dmodel"],
-            nhead = config["nhead"],
-            d_ff_trsf = config["nhid_ff_trsf"],
-            custom_decoder= decoder,
-            nlayers_encoder= config["nlayers_encoder"],
-            nlayers_decoder= config["nlayers_decoder"],
-            nlayers_embedder_src = config["nlayers_embedder_src"],
-            d_ff_embedder_src = config["d_ff_embedder_src"],
-            d_out_embedder_src= config["d_out_embedder_src"],
-            nlayers_embedder_tgt = config["nlayers_embedder_tgt"],
-            d_ff_embedder_tgt = config["d_ff_embedder_tgt"],
-            d_out_embedder_tgt= config["d_out_embedder_tgt"],
-            d_input_encoder = config["d_input_encoder"],
-            d_input_decoder = config["d_input_decoder"],
-            nparticles_max= vpdgs_size,
-            ncharges_max= vcharges_size,
-            DOF_continous= config["output_DOF_continuous"],
-            device = DEVICE,
-            dtype = dtype
-        ).to(DEVICE)
-        elif version == 3 or version == 4:
+        if version == 1 or version == 2:
             src_embedder = Embedder(nlayers = config["nlayers_embedder_src"], d_input= config["d_input_encoder"], 
                                     d_model = config["d_out_embedder_src"], d_hid= config["d_ff_embedder_src"])
             tgt_embedder = Embedder(nlayers = config["nlayers_embedder_tgt"], d_input= config["d_input_decoder"], 
@@ -102,7 +63,7 @@ def create_model(config, version, vcharges_size, vpdgs_size):
                                                           device = DEVICE, dtype = dtype)
             decoder_feats = TransformerDecoder(decoder_feats_layer, config["nlayers_encoder"])
             
-            if version == 3:
+            if version == 1:
                 decoder_labels_layer = TransformerDecoderLayer(d_model = config["d_out_embedder_tgt"], nhead = config["nhead"],
                                                                dim_feedforward= config["nhid_ff_trsf"], batch_first= True, 
                                                                norm_first= config["norm_first"], bias= config["bias"],
@@ -167,9 +128,10 @@ args:
     nfeats_labels: int, number of labels features 
 
 '''
-def greedy_func(model,src,vocab_charges, ncluster_max: int, special_symbols: dict, nfeats_labels: int = 6, dtype = torch.float32):
+def greedy_func(model,src,tracks,vocab_charges, ncluster_max: int, special_symbols: dict, nfeats_labels: int = 6, dtype = torch.float32):
     with torch.no_grad():
         src = src.to(DEVICE)
+        tracks = tracks.to(DEVICE)
         #src_padding_mask = src_padding_mask.to(DEVICE)
 
         #Creating <bos> token
@@ -186,8 +148,9 @@ def greedy_func(model,src,vocab_charges, ncluster_max: int, special_symbols: dic
         batch_size = src.shape[0]
         clusters_transfo = torch.tile(bos,(batch_size,1)).to(DEVICE).unsqueeze_(1) #output of decoder, then updated to input decoder
         src_padding_mask, tgt_key_padding_mask = create_mask(src,clusters_transfo, special_symbols["pad"],DEVICE)
+        _, tracks_padding_mask = create_mask(tracks,tracks, special_symbols["pad"],DEVICE)
         #feeding source to encoder
-        memory = model.encode(src,src_padding_mask).to(DEVICE)
+        memory = model.encode(src,tracks,src_padding_mask, tracks_padding_mask).to(DEVICE)
         #tgt_key_padding_mask = torch.zeros(batch_size,1).type(torch.bool).to(DEVICE)
         is_done = torch.zeros(batch_size,1).type(torch.bool).to(DEVICE) #to keep track of which event has eos token
         is_done_prev = torch.clone(is_done) #to keep track of previous status of eos tokens
@@ -285,9 +248,9 @@ def inference(config, args):
     logging.info("Going to inference now")
     pred = []
     labels = []
-    for src, tgt in src_loader:
+    for src, tgt,tracks in src_loader:
         start_time = time()
-        clusters_out = greedy_func(model, src,vocab_charges,config["ncluster_max"],special_symbols,config["d_input_decoder"] -1, dtype).to("cpu")
+        clusters_out = greedy_func(model, src,tracks,vocab_charges,config["ncluster_max"],special_symbols,config["d_input_decoder"] -1, dtype).to("cpu")
         #print(clusters_out.device)
         translate(clusters_out, vocab_charges, vocab_pdgs,E_label_RMS_normalizer)
         pred.append(clusters_out)
@@ -319,18 +282,20 @@ def train_epoch(model, optim, train_dl, special_symbols,vocab_charges, vocab_pdg
     loss_epoch_cont = 0.0
     loss_epoch_tokens = 0.
     count_log = 0
-    for i,(src,tgt) in enumerate(train_dl):
+    for i,(src,tgt, tracks) in enumerate(train_dl):
         src = src.to(DEVICE)
         tgt = tgt.to(DEVICE)
+        tracks = tracks.to(DEVICE)
         #print(f"allocated memory on GPU after moving: {torch.cuda.memory_allocated(device = DEVICE)}")
         src_padding_mask, tgt_padding_mask = create_mask(src,tgt,special_symbols["pad"], DEVICE)
+        _, tracks_padding_mask = create_mask(tracks, tracks,special_symbols["pad"], DEVICE)
         tgt_in_padding_mask = tgt_padding_mask[:,:-1]
         tgt_out_padding_mask = tgt_padding_mask[:,1:]
         tgt_in = tgt[:,:-1] #sets the dimensions of transformer output -> must have the same as tgt_out
-        logits_charges, logits_pdg, logits_cont, logits_tokens = model(src,tgt_in, 
+        logits_charges, logits_pdg, logits_cont, logits_tokens = model(src,tgt_in, tracks, 
                                                                 src_padding_mask,
                                                                 tgt_in_padding_mask,
-                                                                src_padding_mask)
+                                                                src_padding_mask, tracks_padding_mask)
         optim.zero_grad()
         tgt_out = tgt[:,1:,:] #logits are compared with tokens shifted
         tgt_out_charges = tgt_out[...,0].to(torch.long)
@@ -399,65 +364,67 @@ def validate_epoch(model, val_dl, special_symbols,vocab_charges, vocab_pdgs, E_r
     loss_epoch_cont = 0.0
     loss_epoch_tokens = 0.
     count_log = 0
-    for i, (src,tgt) in enumerate(val_dl):
+    for i, (src,tgt, tracks) in enumerate(val_dl):
         src = src.to(DEVICE)
         tgt = tgt.to(DEVICE)
+        tracks = tracks.to(DEVICE)
         with torch.no_grad():
             #print(f"allocated memory on GPU after moving: {torch.cuda.memory_allocated(device = DEVICE)}")
             src_padding_mask, tgt_padding_mask = create_mask(src,tgt,special_symbols["pad"], DEVICE)
-        tgt_in_padding_mask = tgt_padding_mask[:,:-1]
-        tgt_out_padding_mask = tgt_padding_mask[:,1:]
-        tgt_in = tgt[:,:-1] #sets the dimensions of transformer output -> must have the same as tgt_out
-        logits_charges, logits_pdg, logits_cont, logits_tokens = model(src,tgt_in, 
-                                                                src_padding_mask,
-                                                                tgt_in_padding_mask,
-                                                                src_padding_mask)
-        tgt_out = tgt[:,1:,:] #logits are compared with tokens shifted
-        tgt_out_charges = tgt_out[...,0].to(torch.long)
-        tgt_out_pdg = tgt_out[...,1].to(torch.long)
-        tgt_out_cont = tgt_out[...,2:-1] #only (E, n_x,n_y,n_z)
-        tgt_out_tokens = tgt_out[...,-1].to(torch.long)
-        #Using spherical coordinates to get 3D direction vectors
-        logits_cont = get_cartesian_from_angles(logits_cont)
-        #special_tokens are not taken into account in the continuous loss
-        #eos_bos_mask = ((tgt_out_tokens == vocab_charges.get_index(special_symbols["eos"]))
-        #                + (tgt_out_tokens == vocab_charges.get_index(special_symbols["bos"]))) 
-        spe_tokens_mask = ~(tgt_out_tokens == special_symbols["sample"])
-        #Computing the losses
-        loss_charges = loss_fn_charges(logits_charges.transpose(dim0 = -2, dim1 = -1), tgt_out_charges)
-        loss_pdg = loss_fn_pdg(logits_pdg.transpose(dim0 = -2, dim1 = -1), tgt_out_pdg)
-        loss_cont_vec = loss_fn_cont(logits_cont, tgt_out_cont)
-        loss_tokens = loss_fn_tokens(logits_tokens.transpose(-2,-1), tgt_out_tokens)
-        #nspe_tokens = torch.count_nonzero(spe_tokens_mask, dim = -1)
-        #n_nospe = spe_tokens_mask.shape[-1] - nspe_tokens
-        loss_cont = torch.mean(torch.sum(loss_cont_vec[~spe_tokens_mask], dim = -1))
-        
-        loss = loss_charges * hyperweights_lossfn[0] + loss_pdg * hyperweights_lossfn[1] + loss_cont*hyperweights_lossfn[2] + loss_tokens * hyperweights_lossfn[-1]
+            _, tracks_padding_mask = create_mask(tracks,tracks,special_symbols["pad"], DEVICE)
+            tgt_in_padding_mask = tgt_padding_mask[:,:-1]
+            tgt_out_padding_mask = tgt_padding_mask[:,1:]
+            tgt_in = tgt[:,:-1] #sets the dimensions of transformer output -> must have the same as tgt_out
+            logits_charges, logits_pdg, logits_cont, logits_tokens = model(src,tgt_in, 
+                                                                    src_padding_mask,
+                                                                    tgt_in_padding_mask,
+                                                                    src_padding_mask)
+            tgt_out = tgt[:,1:,:] #logits are compared with tokens shifted
+            tgt_out_charges = tgt_out[...,0].to(torch.long)
+            tgt_out_pdg = tgt_out[...,1].to(torch.long)
+            tgt_out_cont = tgt_out[...,2:-1] #only (E, n_x,n_y,n_z)
+            tgt_out_tokens = tgt_out[...,-1].to(torch.long)
+            #Using spherical coordinates to get 3D direction vectors
+            logits_cont = get_cartesian_from_angles(logits_cont)
+            #special_tokens are not taken into account in the continuous loss
+            #eos_bos_mask = ((tgt_out_tokens == vocab_charges.get_index(special_symbols["eos"]))
+            #                + (tgt_out_tokens == vocab_charges.get_index(special_symbols["bos"]))) 
+            spe_tokens_mask = ~(tgt_out_tokens == special_symbols["sample"])
+            #Computing the losses
+            loss_charges = loss_fn_charges(logits_charges.transpose(dim0 = -2, dim1 = -1), tgt_out_charges)
+            loss_pdg = loss_fn_pdg(logits_pdg.transpose(dim0 = -2, dim1 = -1), tgt_out_pdg)
+            loss_cont_vec = loss_fn_cont(logits_cont, tgt_out_cont)
+            loss_tokens = loss_fn_tokens(logits_tokens.transpose(-2,-1), tgt_out_tokens)
+            #nspe_tokens = torch.count_nonzero(spe_tokens_mask, dim = -1)
+            #n_nospe = spe_tokens_mask.shape[-1] - nspe_tokens
+            loss_cont = torch.mean(torch.sum(loss_cont_vec[~spe_tokens_mask], dim = -1))
 
-        #logging.info(f"training: batch done")
-        loss_epoch += loss.item()
-        loss_epoch_tot += loss.item()
-        loss_epoch_charges += loss_charges.item()
-        loss_epoch_pdgs += loss_pdg.item()
-        loss_epoch_cont += loss_cont.item()
-        loss_epoch_tokens += loss_tokens.item()
-        size_batch = len(val_dl)
+            loss = loss_charges * hyperweights_lossfn[0] + loss_pdg * hyperweights_lossfn[1] + loss_cont*hyperweights_lossfn[2] + loss_tokens * hyperweights_lossfn[-1]
 
-        if (i + 1) % period == 0:
-            #logging.info(f"recording the losses, training, minibatch = {i + 1}")
-            #print(nlog_epoch)
-            loss_evo["val"][nlog_epoch *epoch + count_log] = loss_epoch / period
-            loss_evo["charges_val"][nlog_epoch *epoch + count_log] = loss_epoch_charges / period
-            loss_evo["pdgs_val"][nlog_epoch *epoch + count_log] = loss_epoch_pdgs / period
-            loss_evo["cont_val"][nlog_epoch *epoch + count_log] = loss_epoch_cont / period
-            loss_evo["tokens_val"][nlog_epoch *epoch + count_log] = loss_epoch_tokens / period
+            #logging.info(f"training: batch done")
+            loss_epoch += loss.item()
+            loss_epoch_tot += loss.item()
+            loss_epoch_charges += loss_charges.item()
+            loss_epoch_pdgs += loss_pdg.item()
+            loss_epoch_cont += loss_cont.item()
+            loss_epoch_tokens += loss_tokens.item()
+            size_batch = len(val_dl)
 
-            loss_epoch = 0.
-            loss_epoch_charges = 0.
-            loss_epoch_pdgs = 0.
-            loss_epoch_cont = 0.
-            loss_epoch_tokens = 0.
-            count_log += 1
+            if (i + 1) % period == 0:
+                #logging.info(f"recording the losses, training, minibatch = {i + 1}")
+                #print(nlog_epoch)
+                loss_evo["val"][nlog_epoch *epoch + count_log] = loss_epoch / period
+                loss_evo["charges_val"][nlog_epoch *epoch + count_log] = loss_epoch_charges / period
+                loss_evo["pdgs_val"][nlog_epoch *epoch + count_log] = loss_epoch_pdgs / period
+                loss_evo["cont_val"][nlog_epoch *epoch + count_log] = loss_epoch_cont / period
+                loss_evo["tokens_val"][nlog_epoch *epoch + count_log] = loss_epoch_tokens / period
+
+                loss_epoch = 0.
+                loss_epoch_charges = 0.
+                loss_epoch_pdgs = 0.
+                loss_epoch_cont = 0.
+                loss_epoch_tokens = 0.
+                count_log += 1
     #return (loss_epoch / size_batch, loss_epoch_charges / size_batch, loss_epoch_pdgs / size_batch, loss_epoch_cont / size_batch)
     return loss_epoch_tot / size_batch
 
@@ -479,7 +446,8 @@ def train_and_validate(config, args):
                                                                                               model_mode = "training",
                                                                                               preprocessed= config["preprocessed"],
                                                                                               E_cut= config["E_cut"],
-                                                                                              shuffle = config["shuffle"])
+                                                                                              shuffle = config["shuffle"]
+                                                                                              do_tracks= config["do_tracks"])
     torch.save(vocab_charges.vocab, config["dir_results"] + "vocab_charges.pt")
     torch.save(vocab_pdgs.vocab, config["dir_results"] + "vocab_PDGs.pt")
     

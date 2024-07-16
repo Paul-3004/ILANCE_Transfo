@@ -67,7 +67,7 @@ class CustomDecoder(nn.Module):
         return output
 
 class CustomDecoderLayer(nn.Module):
-    def __init__(self,d_label, d_proj,nproj, nhead, dim_ff_sub, dim_ff_main, batch_first, dtype, device,activation = nn.ReLU(), dropout = 0.1):
+    def __init__(self,d_label, d_proj,nproj, nhead, dim_ff_sub, dim_ff_main, batch_first, norm_first,dtype, device,activation = nn.ReLU(), dropout = 0.1):
         super(CustomDecoderLayer, self).__init__()
         self.dtype = dtype
         self.device = device
@@ -78,7 +78,7 @@ class CustomDecoderLayer(nn.Module):
         self.dim_proj = dim_proj
         
         projection = nn.Linear(d_label, d_proj,dtype = dtype, device = device, bias = False)
-        decoder_sublayer = nn.TransformerDecoderLayer(d_proj,nhead,dim_ff_sub,batch_first=batch_first, device = device, dtype = dtype)
+        decoder_sublayer = nn.TransformerDecoderLayer(d_proj,nhead,dim_ff_sub,batch_first=batch_first, device = device, dtype = dtype, norm_first=norm_first)
 
         self.projections = _get_clones(projection, nproj)
         self.decoder_layers = _get_clones(decoder_sublayer,nproj)
@@ -188,7 +188,7 @@ class CustomTransformer(nn.Module):
 class ClustersFinder(nn.Module):
     def __init__(self, dmodel, nhead, d_ff_trsf, device, nlayers_encoder,
                                                                 nlayers_decoder,
-                                                                custom_decoder = None,
+                                                                custom_decoder = None,                                                        
                                                                 nlayers_embedder_src: int = 2, 
                                                                 d_ff_embedder_src: int = 256,
                                                                 d_out_embedder_src: int = 128,
@@ -201,13 +201,12 @@ class ClustersFinder(nn.Module):
                                                                 ncharges_max: int = 3,
                                                                 DOF_continous: int = 3,
                                                                 dtype = torch.float32
-                                                                ):
-        
+                                                                ):        
         super(ClustersFinder,self).__init__()
         self.device = device
         self.dtype = dtype
-        self.input_embedder = Embedder(nlayers = nlayers_embedder_src, d_input=d_input_encoder,d_model=d_out_embedder_src,d_hid = d_ff_embedder_src, dtype = dtype)
-        self.tgt_embedder = Embedder(nlayers = nlayers_embedder_tgt, d_input=d_input_decoder,d_model=d_out_embedder_tgt, d_hid = d_ff_embedder_tgt, dtype = dtype)
+        self.input_embedder = Embedder(nlayers=nlayers_embedder_src,d_input=d_input_encoder,d_model = d_out_embedder_src, d_hid=d_ff_embedder_src)
+        self.tgt_embedder = Embedder(nlayers=nlayers_embedder_tgt,d_input=d_input_decoder,d_model = d_out_embedder_tgt, d_hid=d_ff_embedder_tgt)
         self.transformer = CustomTransformer(d_model=dmodel, 
                                           nhead = nhead, 
                                           dim_feedforward= d_ff_trsf,
@@ -280,3 +279,133 @@ class ClustersFinder(nn.Module):
                                         tgt_is_causal = True, #generates tgt_mask causal 
                                         tgt_key_padding_mask = tgt_key_padding_mask,
                                         memory_key_padding_mask = memory_key_padding_mask)
+
+class ClustersFinderTracks(nn.Module):
+    def __init__(self, input_embedder, tgt_embedder, tracks_embedder,transfo, device,
+                 nparticles_max: int = 10, ncharges_max: int = 3, DOF_continous: int = 3, dtype = torch.float32):
+        
+        super(ClustersFinderTracks,self).__init__()
+        self.device = device
+        self.dtype = dtype
+        self.input_embedder = input_embedder
+        self.tgt_embedder = tgt_embedder
+        self.tracks_embedder = tracks_embedder
+        self.transformer = transfo
+
+        d_out_embedder_tgt = self.tgt_embedder.model[-1].weight.shape[-1] #out dimension is last
+        self.lastlin_charge = nn.Linear(d_out_embedder_tgt,ncharges_max, dtype= dtype)
+        self.lastlin_pdg = nn.Linear(d_out_embedder_tgt,nparticles_max, dtype = dtype)
+        self.lastlin_cont = nn.Linear(d_out_embedder_tgt,DOF_continous, dtype= dtype)
+        self.lastlin_tokens = nn.Linear(d_out_embedder_tgt, 4, dtype = dtype) #3 for pad, bos, sample, eos
+
+    '''forward will be called when the __call__ function of nn.Module will be called., used for training
+        args:
+            src: source sequences, 
+                 shape: (N,S,E), N:number of batches, S: sequence length of src, E: embedding dimension
+            tgt: target sequences
+                 shape: (N,T,E) N, E same as for src, T: seq, length of tgt
+            src_padding_mask: mask to avoid attention computed on padding tokens of the source
+            tgt_padding_mask: mask to avoid attention computed on padding tokens of the target
+            memory_padding_mask: mask to avoid attention computed on padding tokens of memory (output of decoder)
+        Note:
+            1. if tgt_is_causal is True, tgt_mask is generated automatically as a causal mask'''
+    def forward(self, src, tgt,tracks, src_padding_mask, tgt_padding_mask, memory_padding_mask, tracks_padding_mask):
+        src = self.input_embedder(src)
+        tgt = self.tgt_embedder(tgt)
+        tracks = self.tracks_embedder(tracks)
+        output = self.transformer(src = src, tracks = tracks, labels = tgt, 
+                                  src_key_padding_mask = src_padding_mask, 
+                                  tgt_key_padding_mask = tgt_padding_mask,
+                                  memory_key_padding_mask = memory_padding_mask,
+                                  tracks_padding_mask = tracks_padding_mask,
+                                  tgt_mask = self.generate_causal_mask(tgt.shape[1], self.device),
+                                  tgt_is_causal = True, #generates causal mask for tgt  
+                                  )
+        
+        return (self.lastlin_charge(output), #unnormalised probabilities for charge
+                self.lastlin_pdg(output), #unnormalised probabilities for pdg
+                self.lastlin_cont(output), #Continuous regression
+                self.lastlin_tokens(output) )
+
+    def	generate_causal_mask(self,sz, device):
+        return torch.triu(torch.ones(sz,sz), diagonal = 1).type(torch.bool).to(device = device)
+    
+    '''Used during inference. Input: source batch,
+                              returns: memory: output of the transformer's encoder 
+        args: 
+            src: source batch, shape: (N,S,E)
+            src_key_padding_mask: mask to mask padding tokens in the the batch,
+                                  Useful if src input is given as batches during inference.
+    '''
+    def encode(self, src, tracks, src_key_padding_mask, tracks_padding_mask):
+        return self.transformer.decoder_feats(tgt = self.input_embedder(src), 
+                                              memory = self.tracks_embedder(tracks),
+                                              tgt_key_padding_mask = src_key_padding_mask,
+                                              tgt_is_causal = False,
+                                              tgt_mask = None, 
+                                              memory_key_padding_mask = tracks_padding_mask
+                                              )
+    
+    '''Used during inference. Input: memory and target,
+                              returns: output of the transformer's decoder 
+        args: 
+            tgt: target batch obtained during inference, shape: (N,T,E)
+            memory_key_padding_mask: to mask padding tokens in the batch
+                                     Useful if src input is given as batches during inference.
+    '''
+    def decode(self, tgt, memory, tgt_key_padding_mask, memory_key_padding_mask):
+        return self.transformer.decoder(self.tgt_embedder(tgt), memory, 
+                                        tgt_mask = self.generate_causal_mask(tgt.shape[1],device = self.device),
+                                        tgt_is_causal = True, #generates tgt_mask causal 
+                                        tgt_key_padding_mask = tgt_key_padding_mask,
+                                        memory_key_padding_mask = memory_key_padding_mask)
+
+class TransfoDoubleDecoder(nn.Module):
+    def __init__(self, decoder_feats, decoder_labels, device, dtype= torch.float32) -> None:
+        super(TransfoDoubleDecoder,self).__init__()
+        torch._C._log_api_usage_once(f"torch.nn.modules.{self.__class__.__name__}")
+        self.decoder_feats = decoder_feats
+        self.decoder_labels = decoder_labels
+        self._reset_parameters()
+
+    def _reset_parameters(self):
+        r"""Initiate parameters in the transformer model."""
+        for p in self.parameters():
+            if p.dim() > 1:
+                nn.init.xavier_uniform_(p)
+
+    def forward(self, src, tracks, labels, src_padding_mask, 
+                                           tgt_padding_mask, 
+                                           memory_padding_mask, 
+                                           tracks_padding_mask, 
+                                           tgt_mask, tgt_is_causal):
+        '''
+        src is interpreted as the tracks, 
+        tgt is interpreted as the feats
+
+        first decoder:
+                tgt: corresponds to feats
+                memory: corresponds to tracks
+            since self-attention for the feats, no causal mask -> tgt_mask is None
+            still need padding mask for the feats -> tgt_key_padding_mask = src_padding_mask
+            still need padding mask for the tracks -> memory_key_padding_mask = tracks_padding_mask
+
+        second decoder:
+            tgt: labels
+            memory: feats
+            causal mask etc..
+        '''
+        memory_feats = self.decoder_feats(src = src, memory = tracks, 
+                                                        tgt_is_causal = False,
+                                                        tgt_mask = None, 
+                                                        tgt_key_padding_mask = src_padding_mask, 
+                                                        memory_is_causal = False,
+                                                        memory_key_padding_mask = tracks_padding_mask)
+
+        output = self.decoder_labels(src = labels, memory =  memory_feats, 
+                                                           tgt_is_causal = tgt_is_causal,
+                                                           tgt_mask = tgt_mask,
+                                                           tgt_key_padding_mask = tgt_padding_mask,
+                                                           memory_is_causal = False,
+                                                           memory_key_padding_mask = src_padding_mask)
+        return output
