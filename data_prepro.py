@@ -335,17 +335,18 @@ class CollectionHitsTraining(Dataset):
             3. Adds padding for each event, with target max number of tracks in all events + 1
         '''
         pnorm_tracks = np.sqrt(ak.sum(np.square(tracks[...,-3:]), axis = -1))
-        tracks_norm = tracks[...,-4:] / pnorm_tracks #only keep (C, px, py, pz)
-        one = np.ones((1,1,1))
+        p_tracks = tracks[...,-3:] / pnorm_tracks
+        tracks_norm = ak.concatenate((ak.singletons(tracks[...,-4], axis = -1), p_tracks),axis = -1)
+        one = np.ones((1,1,1)) * special_symbols["sample"]
         tracks_norm = ak.concatenate((tracks_norm, one), axis = -1)
-        nfeats = int(ak.num(tracks_norm, axis = -1)[0])
-        ntracks_max = int(ak.max(ak.num(tracks_norm, axis = 0)))
+        nfeats = int(ak.num(tracks_norm, axis = -1)[0,0])
+        ntracks_max = int(ak.max(ak.num(tracks_norm, axis = 1)))
         target = ntracks_max + 1 #in case ntracks_max = 0, at least there's one pad 
         pad = np.zeros(nfeats)
         pad[-1] = special_symbols["pad"]
         tracks_feats_none = ak.pad_none(tracks_norm, target = target, axis = 1, clip = True)
         tracks_feats_padded = ak.fill_none(tracks_feats_none, pad, axis = None)
-        self.tracks_feats = torch.from_numpy(ak.to_numpy(tracks_feats_padded))
+        self.tracks_feats = torch.from_numpy(ak.to_numpy(tracks_feats_padded)).to(dtype = torch.float32)
         
     #necessary methods to override
     #called when applying len(), must be an integer (note: same numbers of feats than label)
@@ -368,7 +369,8 @@ def get_data(dir_path, batch_size, frac_files,model_mode:str, preprocessed: bool
             "eos": 2,
             "sample": 3
     }
-    print(preprocessed)
+    print(f"preprocessed: {preprocessed}")
+    print(f"do_tracks: {do_tracks}")
     if model_mode == "training":
         dir_path_train, dir_path_val = dir_path
         data_set_train = CollectionHitsTraining(dir_path_train,special_symbols, frac_files, preprocessed, E_cut, do_tracks)
@@ -389,7 +391,7 @@ def get_data(dir_path, batch_size, frac_files,model_mode:str, preprocessed: bool
 
     elif model_mode == "inference":
         dir_path_inference = dir_path[0]
-        data_set = CollectionHitsTraining(dir_path_inference, special_symbols, frac_files, preprocessed, do_tracks)
+        data_set = CollectionHitsTraining(dir_path_inference, special_symbols, frac_files, preprocessed, E_cut,do_tracks)
         E_label_RMSNormalizer = data_set.E_label_RMS_normalizer
         return special_symbols, E_label_RMSNormalizer, DataLoader(data_set, batch_size = batch_size)
     else:

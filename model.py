@@ -67,7 +67,7 @@ class CustomDecoder(nn.Module):
         return output
 
 class CustomDecoderLayer(nn.Module):
-    def __init__(self,d_label, d_proj,nproj, nhead, dim_ff_sub, dim_ff_main, batch_first, norm_first,dtype, device,activation = nn.ReLU(), dropout = 0.1):
+    def __init__(self,d_label, d_proj,nproj, nhead, dim_ff_sub, dim_ff_main, batch_first, norm_first,bias,dtype, device,activation = nn.ReLU(), dropout = 0.1):
         super(CustomDecoderLayer, self).__init__()
         self.dtype = dtype
         self.device = device
@@ -78,7 +78,7 @@ class CustomDecoderLayer(nn.Module):
         self.dim_proj = dim_proj
         
         projection = nn.Linear(d_label, d_proj,dtype = dtype, device = device, bias = False)
-        decoder_sublayer = nn.TransformerDecoderLayer(d_proj,nhead,dim_ff_sub,batch_first=batch_first, device = device, dtype = dtype, norm_first=norm_first)
+        decoder_sublayer = nn.TransformerDecoderLayer(d_proj,nhead,dim_ff_sub,batch_first=batch_first, device = device, dtype = dtype, norm_first=norm_first, bias = bias)
 
         self.projections = _get_clones(projection, nproj)
         self.decoder_layers = _get_clones(decoder_sublayer,nproj)
@@ -200,11 +200,14 @@ class ClustersFinder(nn.Module):
                                                                 nparticles_max: int = 10, 
                                                                 ncharges_max: int = 3,
                                                                 DOF_continous: int = 3,
-                                                                dtype = torch.float32
+                                                                dtype = torch.float32,
+                                                                bias = True,
+                                                                last_FFN = False
                                                                 ):        
         super(ClustersFinder,self).__init__()
         self.device = device
         self.dtype = dtype
+        self.last_FFN = last_FFN
         self.input_embedder = Embedder(nlayers=nlayers_embedder_src,d_input=d_input_encoder,d_model = d_out_embedder_src, d_hid=d_ff_embedder_src)
         self.tgt_embedder = Embedder(nlayers=nlayers_embedder_tgt,d_input=d_input_decoder,d_model = d_out_embedder_tgt, d_hid=d_ff_embedder_tgt)
         self.transformer = CustomTransformer(d_model=dmodel, 
@@ -215,13 +218,19 @@ class ClustersFinder(nn.Module):
                                           custom_decoder= custom_decoder,
                                           batch_first= True,
                                           dtype = dtype,
-                                          device = device)
+                                             device = device,
+                                             bias = bias)
 
         self.lastlin_charge = nn.Linear(d_out_embedder_tgt,ncharges_max, dtype= dtype)
         self.lastlin_pdg = nn.Linear(d_out_embedder_tgt,nparticles_max, dtype = dtype)
         self.lastlin_cont = nn.Linear(d_out_embedder_tgt,DOF_continous, dtype= dtype)
         self.lastlin_tokens = nn.Linear(d_out_embedder_tgt, 4, dtype = dtype) #3 for pad, bos, sample, eos
 
+        if last_FFN:
+            self.FFN_charge = Embedder(d_model = ncharges_max, d_input = ncharges_max,d_hid = 128, nlayers = 2)
+            self.FFN_cont = Embedder(d_model = DOF_continous, d_input = DOF_continous,d_hid = 128, nlayers = 2)
+            self.FFN_tokens = Embedder(d_model = 4, d_input = 4,d_hid = 128, nlayers = 2)
+            self.FFN_pdg = Embedder(d_model = nparticles_max, d_input = nparticles_max,d_hid = 128, nlayers = 2)
     '''forward will be called when the __call__ function of nn.Module will be called., used for training
         args:
             src: source sequences, 
@@ -243,11 +252,21 @@ class ClustersFinder(nn.Module):
                                   tgt_mask = self.generate_causal_mask(tgt.shape[1], device = self.device),
                                   tgt_is_causal = True, #generates causal mask for tgt  
                                   )
-        
-        return (self.lastlin_charge(output), #unnormalised probabilities for charge
-                self.lastlin_pdg(output), #unnormalised probabilities for pdg
-                self.lastlin_cont(output), #Continuous regression
-                self.lastlin_tokens(output) )
+        out_charge = self.lastlin_charge(output)
+        out_pdg = self.lastlin_pdg(output)
+        out_cont = self.lastlin_cont(output)
+        out_tokens = self.lastlin_tokens(output)
+
+        if self.last_FFN:
+            out_charge = self.FFN_charge(out_charge)
+            out_pdg = self.FFN_pdg(out_pdg)
+            out_cont = self.FFN_cont(out_cont)
+            out_tokens = self.FFN_tokens(out_tokens)
+            
+        return (out_charge, #unnormalised probabilities for charge
+                out_pdg, #unnormalised probabilities for pdg
+                out_cont, #Continuous regression
+                out_tokens )
 
     def	generate_causal_mask(self,sz, device):
         return torch.triu(torch.ones(sz,sz), diagonal = 1).type(torch.bool).to(device = device)
@@ -274,29 +293,53 @@ class ClustersFinder(nn.Module):
             2. tgt_mask doesn't need to be supplied if tgt_is_causal is True. Pytorch generates it auto
     '''
     def decode(self, tgt, memory, tgt_key_padding_mask, memory_key_padding_mask):
-        return self.transformer.decoder(self.tgt_embedder(tgt), memory, 
+        output = self.transformer.decoder(self.tgt_embedder(tgt), memory,
                                         tgt_mask = self.generate_causal_mask(tgt.shape[1],device = self.device),
-                                        tgt_is_causal = True, #generates tgt_mask causal 
+                                        tgt_is_causal = True, #generates tgt_mask causal                                                                                            
                                         tgt_key_padding_mask = tgt_key_padding_mask,
-                                        memory_key_padding_mask = memory_key_padding_mask)
+                                        memory_key_padding_mask = memory_key_padding_mask) 
+        out_charge = self.lastlin_charge(output)
+        out_pdg = self.lastlin_pdg(output)
+        out_cont = self.lastlin_cont(output)
+        out_tokens = self.lastlin_tokens(output)
+
+        if self.last_FFN:
+            out_charge = self.FFN_charge(out_charge)
+            out_pdg = self.FFN_pdg(out_pdg)
+            out_cont = self.FFN_cont(out_cont)
+            out_tokens = self.FFN_tokens(out_tokens)
+
+        return (out_charge, #unnormalised probabilities for charge                                                                                                                  
+                out_pdg, #unnormalised probabilities for pdg                                                                                                                        
+                out_cont, #Continuous regression                                                                                                                                    
+                out_tokens )
+
+        
 
 class ClustersFinderTracks(nn.Module):
     def __init__(self, input_embedder, tgt_embedder, tracks_embedder,transfo, device,
-                 nparticles_max: int = 10, ncharges_max: int = 3, DOF_continous: int = 3, dtype = torch.float32):
+                 nparticles_max: int = 10, ncharges_max: int = 3, DOF_continous: int = 3, dtype = torch.float32, last_FFN = False):
         
         super(ClustersFinderTracks,self).__init__()
         self.device = device
         self.dtype = dtype
+        self.last_FFN = last_FFN
         self.input_embedder = input_embedder
         self.tgt_embedder = tgt_embedder
         self.tracks_embedder = tracks_embedder
         self.transformer = transfo
 
-        d_out_embedder_tgt = self.tgt_embedder.model[-1].weight.shape[-1] #out dimension is last
+        d_out_embedder_tgt = self.tgt_embedder.model[-1].weight.shape[0] #out dimension is last
         self.lastlin_charge = nn.Linear(d_out_embedder_tgt,ncharges_max, dtype= dtype)
         self.lastlin_pdg = nn.Linear(d_out_embedder_tgt,nparticles_max, dtype = dtype)
         self.lastlin_cont = nn.Linear(d_out_embedder_tgt,DOF_continous, dtype= dtype)
         self.lastlin_tokens = nn.Linear(d_out_embedder_tgt, 4, dtype = dtype) #3 for pad, bos, sample, eos
+
+        if last_FFN:
+            self.FFN_charge = Embedder(d_model = ncharges_max, d_input = ncharges_max,d_hid = 128, nlayers = 2)
+            self.FFN_cont = Embedder(d_model = DOF_continous, d_input = DOF_continous,d_hid = 128, nlayers = 2)
+            self.FFN_tokens = Embedder(d_model = 4, d_input = 4,d_hid = 128, nlayers = 2)
+            self.FFN_pdg = Embedder(d_model = nparticles_max, d_input = nparticles_max,d_hid = 128, nlayers = 2)
 
     '''forward will be called when the __call__ function of nn.Module will be called., used for training
         args:
@@ -317,15 +360,25 @@ class ClustersFinderTracks(nn.Module):
                                   src_key_padding_mask = src_padding_mask, 
                                   tgt_key_padding_mask = tgt_padding_mask,
                                   memory_key_padding_mask = memory_padding_mask,
-                                  tracks_padding_mask = tracks_padding_mask,
+                                  tracks_key_padding_mask = tracks_padding_mask,
                                   tgt_mask = self.generate_causal_mask(tgt.shape[1], self.device),
                                   tgt_is_causal = True, #generates causal mask for tgt  
                                   )
-        
-        return (self.lastlin_charge(output), #unnormalised probabilities for charge
-                self.lastlin_pdg(output), #unnormalised probabilities for pdg
-                self.lastlin_cont(output), #Continuous regression
-                self.lastlin_tokens(output) )
+        out_charge = self.lastlin_charge(output)
+        out_pdg = self.lastlin_pdg(output)
+        out_cont = self.lastlin_cont(output)
+        out_tokens = self.lastlin_tokens(output)
+
+        if self.last_FFN:
+            out_charge = self.FFN_charge(out_charge)
+            out_pdg = self.FFN_pdg(out_pdg)
+            out_cont = self.FFN_cont(out_cont)
+            out_tokens = self.FFN_tokens(out_tokens)
+
+        return (out_charge, #unnormalised probabilities for charge                                                                                                                  
+                out_pdg, #unnormalised probabilities for pdg                                                                                                                        
+                out_cont, #Continuous regression                                                                                                                                    
+                out_tokens )
 
     def	generate_causal_mask(self,sz, device):
         return torch.triu(torch.ones(sz,sz), diagonal = 1).type(torch.bool).to(device = device)
@@ -354,11 +407,27 @@ class ClustersFinderTracks(nn.Module):
                                      Useful if src input is given as batches during inference.
     '''
     def decode(self, tgt, memory, tgt_key_padding_mask, memory_key_padding_mask):
-        return self.transformer.decoder(self.tgt_embedder(tgt), memory, 
+        output = self.transformer.decoder_labels(self.tgt_embedder(tgt), memory, 
                                         tgt_mask = self.generate_causal_mask(tgt.shape[1],device = self.device),
                                         tgt_is_causal = True, #generates tgt_mask causal 
                                         tgt_key_padding_mask = tgt_key_padding_mask,
                                         memory_key_padding_mask = memory_key_padding_mask)
+
+        out_charge = self.lastlin_charge(output)
+        out_pdg = self.lastlin_pdg(output)
+        out_cont = self.lastlin_cont(output)
+        out_tokens = self.lastlin_tokens(output)
+
+        if self.last_FFN:
+            out_charge = self.FFN_charge(out_charge)
+            out_pdg = self.FFN_pdg(out_pdg)
+            out_cont = self.FFN_cont(out_cont)
+            out_tokens = self.FFN_tokens(out_tokens)
+
+        return (out_charge, #unnormalised probabilities for charge                                                                                                                  
+                out_pdg, #unnormalised probabilities for pdg                                                                                                                        
+                out_cont, #Continuous regression                                                                                                                                    
+                out_tokens )
 
 class TransfoDoubleDecoder(nn.Module):
     def __init__(self, decoder_feats, decoder_labels, device, dtype= torch.float32) -> None:
@@ -374,10 +443,10 @@ class TransfoDoubleDecoder(nn.Module):
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
 
-    def forward(self, src, tracks, labels, src_padding_mask, 
-                                           tgt_padding_mask, 
-                                           memory_padding_mask, 
-                                           tracks_padding_mask, 
+    def forward(self, src, tracks, labels, src_key_padding_mask, 
+                                           tgt_key_padding_mask, 
+                                           memory_key_padding_mask, 
+                                           tracks_key_padding_mask, 
                                            tgt_mask, tgt_is_causal):
         '''
         src is interpreted as the tracks, 
@@ -395,17 +464,17 @@ class TransfoDoubleDecoder(nn.Module):
             memory: feats
             causal mask etc..
         '''
-        memory_feats = self.decoder_feats(src = src, memory = tracks, 
+        memory_feats = self.decoder_feats(tgt = src, memory = tracks, 
                                                         tgt_is_causal = False,
                                                         tgt_mask = None, 
-                                                        tgt_key_padding_mask = src_padding_mask, 
+                                                        tgt_key_padding_mask = src_key_padding_mask, 
                                                         memory_is_causal = False,
-                                                        memory_key_padding_mask = tracks_padding_mask)
-
-        output = self.decoder_labels(src = labels, memory =  memory_feats, 
+                                                        memory_key_padding_mask = tracks_key_padding_mask)
+        
+        output = self.decoder_labels(tgt = labels, memory =  memory_feats, 
                                                            tgt_is_causal = tgt_is_causal,
                                                            tgt_mask = tgt_mask,
-                                                           tgt_key_padding_mask = tgt_padding_mask,
+                                                           tgt_key_padding_mask = tgt_key_padding_mask,
                                                            memory_is_causal = False,
-                                                           memory_key_padding_mask = src_padding_mask)
+                                                           memory_key_padding_mask = src_key_padding_mask)
         return output

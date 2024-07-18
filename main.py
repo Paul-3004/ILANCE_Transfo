@@ -9,7 +9,7 @@ import numpy as np
 from math import ceil
 
 from data_prepro import create_mask, get_data, Vocab
-from model import ClustersFinder, CustomDecoderLayer, CustomDecoder, ClustersFinderTracks, Embedder, TransfoDoubleEncoder
+from model import ClustersFinder, CustomDecoderLayer, CustomDecoder, ClustersFinderTracks, Embedder, TransfoDoubleDecoder
 from argparse import ArgumentParser
 import json
 import logging
@@ -50,7 +50,7 @@ def create_model(config, version, vcharges_size, vpdgs_size):
         dtype = torch.float32
     
     #version = args.model
-    if version == 1 or version == 2
+    if version == 1 or version == 2:
         if version == 1:
             decoder = None
         elif version == 2:
@@ -63,7 +63,8 @@ def create_model(config, version, vcharges_size, vpdgs_size):
                                                batch_first= True,
                                                norm_first= config["norm_first"],
                                                dtype = dtype,
-                                               device = DEVICE)
+                                               device = DEVICE,
+                                               bias = config["bias"])
             decoder = CustomDecoder(decoder_layer, config["nlayers_decoder"])
 
         #Creating model
@@ -86,9 +87,12 @@ def create_model(config, version, vcharges_size, vpdgs_size):
             ncharges_max= vcharges_size,
             DOF_continous= config["output_DOF_continuous"],
             device = DEVICE,
-            dtype = dtype
+            dtype = dtype,
+            bias = config["bias"],
+            last_FFN = config["last_FFN"]
         ).to(DEVICE)
-        elif version == 3 or version == 4:
+        '''
+    elif version == 3 or version == 4:
             src_embedder = Embedder(nlayers = config["nlayers_embedder_src"], d_input= config["d_input_encoder"], 
                                     d_model = config["d_out_embedder_src"], d_hid= config["d_ff_embedder_src"])
             tgt_embedder = Embedder(nlayers = config["nlayers_embedder_tgt"], d_input= config["d_input_decoder"], 
@@ -125,7 +129,7 @@ def create_model(config, version, vcharges_size, vpdgs_size):
             model = ClustersFinderTracks(src_embedder,tgt_embedder,tracks_embedder,transfo,DEVICE,
                                         nparticles_max= vpdgs_size, ncharges_max= vcharges_size,
                                         DOF_continous=config["output_continuous"], dtype=dtype)
-
+'''
     return model
 
 '''
@@ -193,12 +197,12 @@ def greedy_func(model,src,vocab_charges, ncluster_max: int, special_symbols: dic
         is_done_prev = torch.clone(is_done) #to keep track of previous status of eos tokens
         for _ in range(ncluster_max-1):
             #Feeding previous decoder output as input
-            out_decoder = model.decode(clusters_transfo, memory, tgt_key_padding_mask, src_padding_mask)
+            out_charge, out_pdg, out_cont, out_tokens = model.decode(clusters_transfo, memory, tgt_key_padding_mask, src_padding_mask)
             #Computing the logits, only considering the last row. 
-            logits_charges_batch = model.lastlin_charge(out_decoder)[:,-1] #shape is [N,T,F]
-            logits_pdg_batch = model.lastlin_pdg(out_decoder)[:,-1]
-            next_DOF_cont_batch = model.lastlin_cont(out_decoder)[:,-1]
-            logits_tokens_batch = model.lastlin_tokens(out_decoder)[:,-1]
+            logits_charges_batch = out_charge[:,-1] #shape is [N,T,F]
+            logits_pdg_batch = out_pdg[:,-1]
+            next_DOF_cont_batch = out_cont[:,-1]
+            logits_tokens_batch = out_tokens[:,-1]
         
             #no need to apply softmax since it's a bijection, and no need to print probabilities
             next_charges_batch = torch.argmax(logits_charges_batch, dim = 1, keepdim = True) #class id same as index by construction

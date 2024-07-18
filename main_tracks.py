@@ -9,7 +9,7 @@ import numpy as np
 from math import ceil
 
 from data_prepro import create_mask, get_data, Vocab
-from model import ClustersFinder, CustomDecoderLayer, CustomDecoder, ClustersFinderTracks, Embedder, TransfoDoubleEncoder
+from model import ClustersFinder, CustomDecoderLayer, CustomDecoder, ClustersFinderTracks, Embedder, TransfoDoubleDecoder
 from argparse import ArgumentParser
 import json
 import logging
@@ -78,14 +78,15 @@ def create_model(config, version, vcharges_size, vpdgs_size):
                                                dim_ff_main = config["dim_ff_main_decoder"],
                                                batch_first= True,
                                                norm_first = config["norm_first"],
+                                               bias = config["bias"],
                                                dtype = dtype,
                                                device = DEVICE)
                 decoder_labels = CustomDecoder(decoder_labels_layer, config["nlayers_decoder"])
-            transfo = TransfoDoubleEncoder(decoder_feats, decoder_labels, device = DEVICE, dtype = dtype)
+            transfo = TransfoDoubleDecoder(decoder_feats, decoder_labels, device = DEVICE, dtype = dtype)
 
             model = ClustersFinderTracks(src_embedder,tgt_embedder,tracks_embedder,transfo,DEVICE,
                                         nparticles_max= vpdgs_size, ncharges_max= vcharges_size,
-                                        DOF_continous=config["output_continuous"], dtype=dtype)
+                                         DOF_continous=config["output_DOF_continuous"], dtype=dtype, last_FFN = config["last_FFN"]).to(DEVICE)
 
     return model
 
@@ -156,12 +157,12 @@ def greedy_func(model,src,tracks,vocab_charges, ncluster_max: int, special_symbo
         is_done_prev = torch.clone(is_done) #to keep track of previous status of eos tokens
         for _ in range(ncluster_max-1):
             #Feeding previous decoder output as input
-            out_decoder = model.decode(clusters_transfo, memory, tgt_key_padding_mask, src_padding_mask)
+            out_charge, out_pdg, out_cont, out_token = model.decode(clusters_transfo, memory, tgt_key_padding_mask, src_padding_mask)
             #Computing the logits, only considering the last row. 
-            logits_charges_batch = model.lastlin_charge(out_decoder)[:,-1] #shape is [N,T,F]
-            logits_pdg_batch = model.lastlin_pdg(out_decoder)[:,-1]
-            next_DOF_cont_batch = model.lastlin_cont(out_decoder)[:,-1]
-            logits_tokens_batch = model.lastlin_tokens(out_decoder)[:,-1]
+            logits_charges_batch = out_charge[:,-1] #shape is [N,T,F]
+            logits_pdg_batch = out_pdg[:,-1]
+            next_DOF_cont_batch = out_cont[:,-1]
+            logits_tokens_batch = out_token[:,-1]
         
             #no need to apply softmax since it's a bijection, and no need to print probabilities
             next_charges_batch = torch.argmax(logits_charges_batch, dim = 1, keepdim = True) #class id same as index by construction
@@ -242,13 +243,13 @@ def inference(config, args):
     special_symbols, E_label_RMS_normalizer, src_loader = get_data((config["dir_path_inference"], ), 
                                                                     config["batch_size_test"], 
                                                                     config["frac_files_test"], "inference", 
-                                                                    False, config["E_cut"], config["shuffle"])
+                                                                    False, config["E_cut"], config["shuffle"], config["do_tracks"])
     logging.info("Saving normalizer...")
     torch.save(E_label_RMS_normalizer, config["dir_results"] + "E_RMS_normalizer.pt")
     logging.info("Going to inference now")
     pred = []
     labels = []
-    for src, tgt,tracks in src_loader:
+    for (src, tgt,tracks) in src_loader:
         start_time = time()
         clusters_out = greedy_func(model, src,tracks,vocab_charges,config["ncluster_max"],special_symbols,config["d_input_decoder"] -1, dtype).to("cpu")
         #print(clusters_out.device)
@@ -375,10 +376,10 @@ def validate_epoch(model, val_dl, special_symbols,vocab_charges, vocab_pdgs, E_r
             tgt_in_padding_mask = tgt_padding_mask[:,:-1]
             tgt_out_padding_mask = tgt_padding_mask[:,1:]
             tgt_in = tgt[:,:-1] #sets the dimensions of transformer output -> must have the same as tgt_out
-            logits_charges, logits_pdg, logits_cont, logits_tokens = model(src,tgt_in, 
+            logits_charges, logits_pdg, logits_cont, logits_tokens = model(src,tgt_in,tracks, 
                                                                     src_padding_mask,
                                                                     tgt_in_padding_mask,
-                                                                    src_padding_mask)
+                                                                           src_padding_mask, tracks_padding_mask)
             tgt_out = tgt[:,1:,:] #logits are compared with tokens shifted
             tgt_out_charges = tgt_out[...,0].to(torch.long)
             tgt_out_pdg = tgt_out[...,1].to(torch.long)
@@ -446,7 +447,7 @@ def train_and_validate(config, args):
                                                                                               model_mode = "training",
                                                                                               preprocessed= config["preprocessed"],
                                                                                               E_cut= config["E_cut"],
-                                                                                              shuffle = config["shuffle"]
+                                                                                              shuffle = config["shuffle"],
                                                                                               do_tracks= config["do_tracks"])
     torch.save(vocab_charges.vocab, config["dir_results"] + "vocab_charges.pt")
     torch.save(vocab_pdgs.vocab, config["dir_results"] + "vocab_PDGs.pt")
