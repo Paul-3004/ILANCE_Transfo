@@ -223,7 +223,7 @@ class ClustersFinder(nn.Module):
 
         self.lastlin_charge = nn.Linear(d_out_embedder_tgt,ncharges_max, dtype= dtype)
         self.lastlin_pdg = nn.Linear(d_out_embedder_tgt,nparticles_max, dtype = dtype)
-        self.lastlin_cont = nn.Linear(d_out_embedder_tgt,DOF_continous, dtype= dtype)
+        self.lastlin_cont = nn.Linear(d_out_embedder_tgt, DOF_continous-1, dtype = dtype)
         self.lastlin_tokens = nn.Linear(d_out_embedder_tgt, 4, dtype = dtype) #3 for pad, bos, sample, eos
 
         if last_FFN:
