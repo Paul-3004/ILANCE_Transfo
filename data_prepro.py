@@ -113,7 +113,7 @@ class RMSNormalizer:
         self.mean = mean
         self.RMS = RMS
 
-class CollectionHitsTraining(Dataset):
+class CollectionHits(Dataset):
     '''Custom Dataset to store the hits and tracks
         Raw Data:
             feats: 3D awkward array of size (N,P,F), where 
@@ -148,14 +148,27 @@ class CollectionHitsTraining(Dataset):
             do_time: bool, if True, time of hits is kept
             E_cut: float, energy value [GeV] above which clusters are kept
             '''
-        if frac_files < 0 or frac_files > 1:
+        super(CollectionHits,self).__init__()
+        self.dir_path = dir_path
+        self.special_symbols = special_symbols
+        self.frac_files = frac_files
+        self.preprocessed = preprocessed
+        self.E_cut = E_cut
+        self.do_tracks = do_tracks
+        self.ntrue_clusters = ntrue_clusters
+        self.do_time = do_time
+        self.E_label_RMS_normalizer = RMSNormalizer()
+        self.E_feats_RMS_normalizer = RMSNormalizer()
+        self.pos_feats_RMS_normalizer = RMSNormalizer()
+
+    def process_dataset(self):
+        if self.frac_files < 0 or self.frac_files > 1:
             raise ValueError("The fraction of files must lie inbetween 0 and 1")
 
-        super(CollectionHitsTraining,self).__init__()
-        if preprocessed:
-            nfiles = ceil(frac_files / 0.02)
-            filenames = list(sorted(glob.iglob(dir_path + '/data/*.pt')))
-            vocab_path = dir_path + "/vocabs/vocabs_normalizer.pt"
+        if self.preprocessed:
+            nfiles = ceil(self.frac_files / 0.02)
+            filenames = list(sorted(glob.iglob(self.dir_path + '/data/*.pt')))
+            vocab_path = self.dir_path + "/vocabs/vocabs_normalizer.pt"
             charges_dict, pdgs_dict, self.E_label_RMS_normalizer = torch.load(vocab_path)
             self.vocab_charges, self.vocab_pdgs = Vocab.from_dict(charges_dict), Vocab.from_dict(pdgs_dict)
             feats, labels = [], []
@@ -167,28 +180,26 @@ class CollectionHitsTraining(Dataset):
             self.feats = torch.concatenate(feats)
             self.labels = torch.concatenate(labels)
         else:
-            filenames = list(sorted(glob.iglob(dir_path + '/*.h5')))
-            nfiles = ceil(frac_files * len(filenames))
+            filenames = list(sorted(glob.iglob(self.dir_path + '/*.h5')))
+            nfiles = ceil(self.frac_files * len(filenames))
             #print(nfiles)
             print("NEW VERSION")
             feats, labels = self._get_data(filenames, nfiles)
                  
-            self.E_cut = E_cut
-            self.do_tracks = do_tracks
             #removing tracks
             hits_mask = ~(feats[:,:,5] == 1)
-            if do_tracks is False:
+            if self.do_tracks is False:
                 feats = feats[hits_mask]
                 labels = labels[hits_mask]
             else:
                 #splitting tracks and hits
                 tracks_feats = feats[~hits_mask] 
                 feats = feats[hits_mask]
-                self.format_tracks(tracks_feats, special_symbols)
+                self.format_tracks(tracks_feats)
                 #no need for tracks in the labels
                 labels = labels[hits_mask]
             #keeping time
-            if do_time:
+            if self.do_time:
                 feats = feats[:,:,:5]
             else:
                 feats = feats[:,:,:4]
@@ -196,19 +207,7 @@ class CollectionHitsTraining(Dataset):
             PDGs_mask = np.abs(labels[...,2]) < 1e3
             labels = labels[PDGs_mask]
 
-            self.E_label_RMS_normalizer = RMSNormalizer()
-            self.E_feats_RMS_normalizer = RMSNormalizer()
-            self.pos_feats_RMS_normalizer = RMSNormalizer()
-            self.formatting(feats, labels, special_symbols)
-
-            if ntrue_clusters != "all":
-                if isinstance(ntrue_clusters, dict):
-                    for key in ntrue_cluster:
-                        mask_ncluster = self.nclusters_events == ntrue_clusters[key]
-                        mask_pdg = ak.all(self.unique_pd)
-                mask = self.nclusters_events == ntrue_clusters
-                self.feats = self.feats[mask]
-                self.labels = self.labels[mask][:,:ntrue_clusters + 3]
+            self.formatting(feats, labels)
 
     def _get_data(self,filenames, nfiles):
         if nfiles == 1:
@@ -216,7 +215,7 @@ class CollectionHitsTraining(Dataset):
         elif nfiles > 1:
             feats, labels = la.load_awkwards(filenames[:nfiles]) #get the events from each file
         else:
-            raise ValueError(f"There is no h5py file in the directory {dir_path}")
+            raise ValueError(f"There is no h5py file in the directory {self.dir_path}")
         return ak.values_astype(feats, np.float32), ak.values_astype(labels, np.float32)
 
 
@@ -241,14 +240,21 @@ class CollectionHitsTraining(Dataset):
         feats: 
         labels: ak.Array, ragged, features of each particle are (charge, pdg, m, px, py, pz)
     '''
-    def formatting(self, feats, labels, special_symbols):
+    def formatting(self, feats, labels):
         #Adding special symbols after formatting feats and labels
-        add_special_symbols = AddSpecialSymbols(special_symbols)
-        feats = add_special_symbols(self.format_feats(feats), "feats")
-        labels = add_special_symbols(self.format_labels(labels), "labels")
+        add_special_symbols = AddSpecialSymbols(self.special_symbols)
+        labels_flat_unique, dim_count = self.shrink_labels(labels)
+        if self.ntrue_clusters != "all":
+            mask_true_cluster = self.select_true_clusters(labels_flat_unique[...,2],dim_count)
+            labels_flat_unique = ak.flatten(ak.unflatten(labels_flat_unique,dim_count)[mask_true_cluster])
+            dim_count = dim_count[mask_true_cluster]
+            feats = add_special_symbols(self.format_feats(feats[mask_true_cluster]), "feats")
+        else:
+            feats = add_special_symbols(self.format_feats(feats), "feats")
+        labels = add_special_symbols(self.format_labels(labels_flat_unique, dim_count), "labels")
+        
         feats = torch.from_numpy(ak.to_numpy(feats)).to(dtype = torch.float32)
         labels = torch.from_numpy(ak.to_numpy(labels)).to(dtype = torch.float32)
-
         self.labels = labels
         self.feats = feats
 
@@ -277,15 +283,7 @@ class CollectionHitsTraining(Dataset):
         self.RMS_normalize(E, "E_label")
         pvec.div_(pvec_norm2.sqrt_().unsqueeze_(-1))
 
-    '''Keep only 1 representative of each clusters in the label dataset 
-        and keep only the features (charge, pdg, E, px,py,z)
-        Args:
-            do_track: to remove track info since hasn't been done previously
-            labels: ak.Array with features: (hitid, mcid, pdg, charge, mass, px, py, pz (of mcp), status)
-        
-        Note: To avoid additional copies when c
-    '''
-    def format_labels(self, labels):
+    def shrink_labels(self, labels):
         if self.do_tracks is True:
             track_mask = (labels[...,0] > 1e-15) #(hitid <= 0) <-> tracks
             labels = labels[track_mask]
@@ -293,7 +291,6 @@ class CollectionHitsTraining(Dataset):
         mcids = labels[...,1]
         counts = ak.run_lengths(ak.sort(mcids,axis = -1)) #computing number of indentical mcids for each event
         dim_count = ak.num(counts, axis = 1) #future dimensions of list of clusters
-        self.nclusters_events = dim_count
 
         nevents = int(ak.num(labels, axis = 0))
         #making each event's mcids unique
@@ -305,6 +302,17 @@ class CollectionHitsTraining(Dataset):
         _, indices_unique = np.unique(ak.to_numpy(mc_id_flat), axis = 0, return_index = True) 
 
         labels_flat = ak.flatten(labels, axis = 1)[indices_unique] #taking first representative 
+        return labels_flat, dim_count
+
+    '''Keep only 1 representative of each clusters in the label dataset 
+        and keep only the features (charge, pdg, E, px,py,z)
+        Args:
+            do_track: to remove track info since hasn't been done previously
+            labels: ak.Array with features: (hitid, mcid, pdg, charge, mass, px, py, pz (of mcp), status)
+        
+        Note: To avoid additional copies when c
+    '''
+    def format_labels(self, labels_flat, dim_count):
         labels_flat_torch = torch.from_numpy(labels_flat.to_numpy()) #ref 
         labels_flat_torch[...,2].abs_() #absolute value of PDGs
         self.format_E_pos_label(labels_flat_torch[...,4:8])
@@ -329,7 +337,7 @@ class CollectionHitsTraining(Dataset):
         self.RMS_normalize(feats_flat_torch[...,-3:], "pos")
         return ak.unflatten(feats_flat_np, counts = dim)
 
-    def format_tracks(self, tracks, special_symbols):
+    def format_tracks(self, tracks):
         '''
         Formats the tracks.
             args:
@@ -349,17 +357,43 @@ class CollectionHitsTraining(Dataset):
         pnorm_tracks = np.sqrt(ak.sum(np.square(tracks[...,-3:]), axis = -1))
         p_tracks = tracks[...,-3:] / pnorm_tracks
         tracks_norm = ak.concatenate((ak.singletons(tracks[...,-4], axis = -1), p_tracks),axis = -1)
-        one = np.ones((1,1,1)) * special_symbols["sample"]
+        one = np.ones((1,1,1)) * self.special_symbols["sample"]
         tracks_norm = ak.concatenate((tracks_norm, one), axis = -1)
         nfeats = int(ak.num(tracks_norm, axis = -1)[0,0])
         ntracks_max = int(ak.max(ak.num(tracks_norm, axis = 1)))
         target = ntracks_max + 1 #in case ntracks_max = 0, at least there's one pad 
         pad = np.zeros(nfeats)
-        pad[-1] = special_symbols["pad"]
+        pad[-1] = self.special_symbols["pad"]
         tracks_feats_none = ak.pad_none(tracks_norm, target = target, axis = 1, clip = True)
         tracks_feats_padded = ak.fill_none(tracks_feats_none, pad, axis = None)
         self.tracks_feats = torch.from_numpy(ak.to_numpy(tracks_feats_padded)).to(dtype = torch.float32)
-        
+    
+
+    def select_true_clusters(self,PDGs_event_flat, dim_count):
+        PDGs_event = ak.unflatten(PDGs_event_flat, dim_count)
+        mask = np.zeros(shape = (ak.num(dim_count, axis = 0), ),dtype=np.bool8)
+        dim_count_np = ak.to_numpy(dim_count)
+        no_event = 0
+        #ntrue_clusters: dict {n1: [pdg_1, ..., pdg_n1], n2 = [...], ...}, n: number of true clusters, pdg: pdg to keep
+        if isinstance(self.ntrue_clusters, dict):
+            for key in self.ntrue_clusters:
+                assert key == len(self.ntrue_clusters[key]), f"{key} clusters but {len(self.ntrue_clusters[key])} were given"
+                mask_ncluster = dim_count_np == key
+                if ak.count_nonzero(mask_ncluster) > 0:
+                    mask_pdg = ak.all(np.isin(self.ntrue_clusters[key], PDGs_event[mask_ncluster]), axis = -1, keepdims = True)
+                    if ak.count_nonzero(mask_pdg) > 0:
+                        mask_ncluster[mask_ncluster > 0] = mask_pdg
+                        mask += mask_ncluster
+                    else: 
+                        no_event += 1
+                        print(f"No events with {key} clusters of PDGs {self.ntrue_clusters[key]} were found")
+                else:
+                    no_event += 1
+                    print(f"No events with {key} clusters of PDGs {self.ntrue_clusters[key]} were found")
+            if no_event == len(self.ntrue_clusters):
+                raise RuntimeError(f"No true events corresponding to {self.ntrue_clusters} were found")
+            return mask
+
     #necessary methods to override
     #called when applying len(), must be an integer (note: same numbers of feats than label)
     def __len__(self):
@@ -373,7 +407,7 @@ class CollectionHitsTraining(Dataset):
         else:
             return self.feats[id1], self.labels[id1]
 
-class CollectionHitsInference(Dataset):
+class CollectionHitsInference(CollectionHits):
     '''Custom Dataset to store the hits and tracks
         Raw Data:
             feats: 3D awkward array of size (N,P,F), where 
@@ -408,73 +442,15 @@ class CollectionHitsInference(Dataset):
             do_time: bool, if True, time of hits is kept
             E_cut: float, energy value [GeV] above which clusters are kept
             '''
+        
         if frac_files < 0 or frac_files > 1:
             raise ValueError("The fraction of files must lie inbetween 0 and 1")
 
-        super(CollectionHitsInference,self).__init__()
-        if preprocessed:
-            nfiles = ceil(frac_files / 0.02)
-            filenames = list(sorted(glob.iglob(dir_path + '/data/*.pt')))
-            vocab_path = dir_path + "/vocabs/vocabs_normalizer.pt"
-            charges_dict, pdgs_dict, self.E_label_RMS_normalizer = torch.load(vocab_path)
-            self.vocab_charges, self.vocab_pdgs = Vocab.from_dict(charges_dict), Vocab.from_dict(pdgs_dict)
-            feats, labels = [], []
-            for f in filenames:
-                feats_f, labels_f = torch.load(f)
-                feats.append(feats_f)
-                labels.append(labels_f)
-            
-            self.feats = torch.concatenate(feats)
-            self.labels = torch.concatenate(labels)
-        else:
-            filenames = list(sorted(glob.iglob(dir_path + '/*.h5')))
-            nfiles = ceil(frac_files * len(filenames))
-            print(nfiles)
-            print("NEW VERSION")
-            feats, labels = self._get_data(filenames, nfiles)
-                 
-            self.E_cut = E_cut
-            self.do_tracks = do_tracks
-            #removing tracks
-            hits_mask = ~(feats[:,:,5] == 1)
-            if do_tracks is False:
-                feats = feats[hits_mask]
-                labels = labels[hits_mask]
-            else:
-                #splitting tracks and hits
-                tracks_feats = feats[~hits_mask] 
-                feats = feats[hits_mask]
-                self.format_tracks(tracks_feats, special_symbols)
-                #no need for tracks in the labels
-                labels = labels[hits_mask]
-            #keeping time
-            if do_time:
-                feats = feats[:,:,:5]
-            else:
-                feats = feats[:,:,:4]
-
-            PDGs_mask = np.abs(labels[...,2]) < 1e3
-            labels = labels[PDGs_mask]
-
-            self.E_label_RMS_normalizer = E_label_norm
-            self.E_feats_RMS_normalizer = E_feats_norm
-            self.pos_feats_RMS_normalizer = pos_feats_norm
-            self.formatting(feats, labels, special_symbols)
-
-            if ntrue_clusters != "all":
-                mask = self.nclusters_events == ntrue_clusters
-                self.feats = self.feats[mask]
-                self.labels = self.labels[mask][:,:ntrue_clusters + 3]
-
-    def _get_data(self,filenames, nfiles):
-        if nfiles == 1:
-            feats, labels = la.load_awkward2(filenames[0]) #get the events from the only file
-        elif nfiles > 1:
-            feats, labels = la.load_awkwards(filenames[:nfiles]) #get the events from each file
-        else:
-            raise ValueError(f"There is no h5py file in the directory {dir_path}")
-        return ak.values_astype(feats, np.float32), ak.values_astype(labels, np.float32)
-
+        super(CollectionHitsInference,self).__init__(dir_path,special_symbols,frac_files,preprocessed,E_cut,do_tracks,ntrue_clusters,do_time)
+        self.E_label_RMS_normalizer = E_label_norm
+        self.E_feats_RMS_normalizer = E_feats_norm
+        self.pos_feats_RMS_normalizer = pos_feats_norm
+        
     def RMS_normalize(self, data,data_type: str):
         mean = torch.mean(data, dim = 0)
         RMS = torch.std(data, dim = 0)
@@ -485,144 +461,6 @@ class CollectionHitsInference(Dataset):
         elif data_type == "E_feats":
                 self.E_feats_RMS_normalizer.normallize(data)
            
-    def formatting(self, feats, labels, special_symbols):
-        '''
-        formats the feats and labels by adding special tokens and normalising.
-        params:
-            feats: 
-            labels: ak.Array, ragged, features of each particle are (charge, pdg, m, px, py, pz)
-        '''
-        #Adding special symbols after formatting feats and labels
-        add_special_symbols = AddSpecialSymbols(special_symbols)
-        feats = add_special_symbols(self.format_feats(feats), "feats")
-        labels = add_special_symbols(self.format_labels(labels), "labels")
-        feats = torch.from_numpy(ak.to_numpy(feats)).to(dtype = torch.float32)
-        labels = torch.from_numpy(ak.to_numpy(labels)).to(dtype = torch.float32)
-
-        self.labels = labels
-        self.feats = feats
-
-        #Creating vocabularies:
-        charges_keys = [-50,-1,0,1]
-        abs_pdg_keys = torch.unique(labels[...,1]).tolist()
-        self.vocab_charges = Vocab(charges_keys)
-        self.vocab_pdgs = Vocab(abs_pdg_keys)
-        labels[...,0] = self.vocab_charges.tokens_to_indices(labels[...,0])
-        labels[...,1] = self.vocab_pdgs.tokens_to_indices(labels[...,1])
-
-    def format_E_pos_label(self, labels_flat):
-        '''called during shrink_labels to compute energy and normalize momentum
-        Args:
-            labels_flat: numpy array as a flatten version of labels 
-                         features are in order:  (mass, px, py, pz)
-                         
-        '''    
-
-        #Computing energies
-        E = labels_flat[...,0]
-        pvec = labels_flat[...,-3:]
-        pvec_norm2 = torch.sum(torch.square(pvec), dim = -1) 
-        #Computing Energy, normalizing and sorting
-        E.square_().add_(pvec_norm2).sqrt_() # E = sqrt{m^2 + p^2}
-        E.log10_()
-        self.RMS_normalize(E, "E_label")
-        pvec.div_(pvec_norm2.sqrt_().unsqueeze_(-1))
-
-    def format_labels(self, labels):
-        '''Keep only 1 representative of each clusters in the label dataset 
-        and keep only the features (charge, pdg, E, px,py,z)
-        Args:
-            do_track: to remove track info since hasn't been done previously
-            labels: ak.Array with features: (hitid, mcid, pdg, charge, mass, px, py, pz (of mcp), status)
-        
-        Note: To avoid additional copies when c
-        '''
-        if self.do_tracks is True:
-            track_mask = (labels[...,0] > 1e-15) #(hitid <= 0) <-> tracks
-            labels = labels[track_mask]
-        
-        mcids = labels[...,1]
-        counts = ak.run_lengths(ak.sort(mcids,axis = -1)) #computing number of indentical mcids for each event
-        dim_count = ak.num(counts, axis = 1) #future dimensions of list of clusters
-        self.nclusters_events = dim_count
-
-        nevents = int(ak.num(labels, axis = 0))
-        #making each event's mcids unique
-        event_label = np.arange(1, nevents+1, step = 1)[:,np.newaxis]
-        mc_id_cartesian = ak.cartesian([event_label, mcids], axis = -1) 
-        #now entries are of the form [[(1,0),(1,0),...,(1,1),...,(1,39)], [(2,0),(2,0),...,(2,27)], ...]
-        mc_id_flat = ak.flatten(mc_id_cartesian, axis = 1)
-        #computing the indices of every unique entry of the flattened array
-        _, indices_unique = np.unique(ak.to_numpy(mc_id_flat), axis = 0, return_index = True) 
-
-        labels_flat = ak.flatten(labels, axis = 1)[indices_unique] #taking first representative 
-        labels_flat_torch = torch.from_numpy(labels_flat.to_numpy()) #ref 
-        labels_flat_torch[...,2].abs_() #absolute value of PDGs
-        self.format_E_pos_label(labels_flat_torch[...,4:8])
-        indices_features = [3,2,4,5,6,7] #3: charge 2: pdg, 4: mass, 5-7: momentum (mass to compute energy)
-        #norm2_torch = labels_flat_torch[]
-        labels = ak.unflatten(labels_flat_torch.numpy(), dim_count)[..., indices_features] #putting back to expected shape
-        #Discarding low energy clusters 
-        self.E_cut = np.log10(self.E_cut)
-        self.E_cut -= self.E_label_RMS_normalizer.mean
-        self.E_cut /= self.E_label_RMS_normalizer.RMS
-        E_mask = labels[...,2] > self.E_cut.item()
-        labels = labels[E_mask]
-        indices_sort_E = ak.argsort(labels[...,2], axis = -1, ascending= False)
-        return labels[indices_sort_E] #sorting by descending energy
-
-    def format_feats(self, feats):
-        dim = ak.num(feats,axis = 1)
-        feats_flat_np = ak.flatten(feats).to_numpy()
-        feats_flat_torch = torch.from_numpy(feats_flat_np)
-        feats_flat_torch[...,0].log10_()
-        self.RMS_normalize(feats_flat_torch[...,0], "E_feat")
-        self.RMS_normalize(feats_flat_torch[...,-3:], "pos")
-        return ak.unflatten(feats_flat_np, counts = dim)
-
-    def format_tracks(self, tracks, special_symbols):
-        '''
-        Formats the tracks.
-            args:
-                tracks: raw tracks from ak.Array. 
-                        features are (Charge, px, py, pz)
-            
-            return: 
-                formatted tracks
-            
-            Algo:
-            1. Momentum is normalised to 1
-            2. Identifying feature is added:
-                1 for real tracks
-                0 for padding
-            3. Adds padding for each event, with target max number of tracks in all events + 1
-        '''
-        pnorm_tracks = np.sqrt(ak.sum(np.square(tracks[...,-3:]), axis = -1))
-        p_tracks = tracks[...,-3:] / pnorm_tracks
-        tracks_norm = ak.concatenate((ak.singletons(tracks[...,-4], axis = -1), p_tracks),axis = -1)
-        one = np.ones((1,1,1)) * special_symbols["sample"]
-        tracks_norm = ak.concatenate((tracks_norm, one), axis = -1)
-        nfeats = int(ak.num(tracks_norm, axis = -1)[0,0])
-        ntracks_max = int(ak.max(ak.num(tracks_norm, axis = 1)))
-        target = ntracks_max + 1 #in case ntracks_max = 0, at least there's one pad 
-        pad = np.zeros(nfeats)
-        pad[-1] = special_symbols["pad"]
-        tracks_feats_none = ak.pad_none(tracks_norm, target = target, axis = 1, clip = True)
-        tracks_feats_padded = ak.fill_none(tracks_feats_none, pad, axis = None)
-        self.tracks_feats = torch.from_numpy(ak.to_numpy(tracks_feats_padded)).to(dtype = torch.float32)
-        
-    #necessary methods to override
-    #called when applying len(), must be an integer (note: same numbers of feats than label)
-    def __len__(self):
-        return self.feats.size(dim = 0)
-    
-    #the sample is the list of hits for 1 event, same for labels 
-    #called when indexing the dataset
-    def __getitem__(self,id1):
-        if self.do_tracks:
-            return self.feats[id1], self.labels[id1], self.tracks_feats[id1]
-        else:
-            return self.feats[id1], self.labels[id1]
 
 def get_data(dir_path, batch_size, frac_files,model_mode:str, preprocessed: bool = False, E_cut: float = 0.1, shuffle: bool = False, do_tracks: bool = False, ntrue_clusters = "all"):
     special_symbols = {
@@ -635,13 +473,15 @@ def get_data(dir_path, batch_size, frac_files,model_mode:str, preprocessed: bool
     print(f"do_tracks: {do_tracks}")
     if model_mode == "training":
         dir_path_train, dir_path_val = dir_path
-        data_set_train = CollectionHitsTraining(dir_path_train,special_symbols, frac_files, preprocessed, E_cut, do_tracks, ntrue_clusters)
+        data_set_train = CollectionHits(dir_path_train,special_symbols, frac_files, preprocessed, E_cut, do_tracks, ntrue_clusters)
+        data_set_train.process_dataset()
         E_label_RMSNormalizer = data_set_train.E_label_RMS_normalizer
         E_feats_RMSNormalizer = data_set_train.E_feats_RMS_normalizer
         pos_feats_RMSNormalizer = data_set_train.pos_feats_RMS_normalizer
         data_set_val = CollectionHitsInference(dir_path_val, special_symbols,
                                                E_label_RMSNormalizer, E_feats_RMSNormalizer, pos_feats_RMSNormalizer,
                                                frac_files,preprocessed, E_cut, do_tracks, ntrue_clusters)
+        data_set_val.process_dataset()
         vocab_charges, vocab_pdgs = data_set_train.vocab_charges, data_set_train.vocab_pdgs
         vocab_charges_val, vocab_pdgs_val = data_set_val.vocab_charges, data_set_val.vocab_pdgs
 
@@ -676,6 +516,7 @@ def get_data_inference(dir_path, batch_size, frac_files, E_label_norm, E_feats_n
     data_set = CollectionHitsInference(dir_path_inference, special_symbols, 
                                        E_label_norm, E_feats_norm, pos_feats_norm,
                                        frac_files, preprocessed, E_cut,do_tracks, ntrue_clusters)
+    data_set.process_dataset()
     E_label_RMSNormalizer = data_set.E_label_RMS_normalizer
     return special_symbols, E_label_RMSNormalizer, DataLoader(data_set, batch_size = batch_size)
 
@@ -692,6 +533,7 @@ def train_val_preprocessing(dir_train, dir_val, dir_res,frac_files, E_cut):
 def preprocessing(dir_data, dir_res, datatype: str, special_symbols, frac_files,E_cut):
     start = time()
     ds = CollectionHitsTraining(dir_data, special_symbols,frac_files, False,E_cut)
+    ds.process_dataset()
     end = time() - start
     print(f"time needed to make preprocessing: {end} sec")
     E_label_normalizer = ds.E_label_RMS_normalizer
