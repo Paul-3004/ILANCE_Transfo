@@ -268,7 +268,7 @@ def inference(config, args):
     logging.info("Loading the vocabularies...")
     vocab_charges = Vocab.from_dict(torch.load(config["path_charges"] + "vocab_charges.pt"))
     vocab_pdgs = Vocab.from_dict(torch.load(config["path_PDGs"] + "vocab_PDGs.pt"))
-    normalizers = torch.load("normalizers.pt")
+    normalizers = torch.load(config["dir_results"] + "normalizers.pt")
     E_label_rms_normalizer = normalizers["E_label_RMS_normalizer"]
     E_feats_rms_normalizer = normalizers["E_feats_RMS_normalizer"]
     pos_feats_rms_normalizer = normalizers["pos_feats_RMS_normalizer"]
@@ -359,10 +359,10 @@ def train_epoch(model, optim, train_dl, special_symbols,vocab_charges, vocab_pdg
         loss_pdg = loss_fn_pdg(logits_pdg.transpose(dim0 = -2, dim1 = -1), tgt_out_pdg)
         #loss_cont_vec = loss_fn_cont(logits_cont, tgt_out_cont)
         loss_cont_E = loss_fn_cont(logits_cont[...,0], tgt_out_cont[...,0]) #gives log(E_p/E_l)^2
-        loss_cont_E = torch.mean(torch.sum(loss_cont_E[~spe_tokens_mask], dim = -1))
+        loss_cont_E = torch.mean(loss_cont_E[~spe_tokens_mask])
         loss_cont_dir = loss_fn_cont(logits_cont[...,-3:], tgt_out_cont[...,-3:])
         loss_cont_dir = torch.mean(torch.sum(loss_cont_dir[~spe_tokens_mask], dim = -1))
-        loss_cont = weights_loss_cont["E"]*torch.mean(loss_cont_E) + weights_loss_cont["dir"]*loss_cont_dir
+        loss_cont = weights_loss_cont["E"]*loss_cont_E + weights_loss_cont["dir"]*loss_cont_dir
         loss_tokens = loss_fn_tokens(logits_tokens.transpose(-2,-1), tgt_out_tokens)
         #nspe_tokens = torch.count_nonzero(spe_tokens_mask, dim = -1)
         #n_nospe = spe_tokens_mask.shape[-1] - nspe_tokens
@@ -454,10 +454,10 @@ def validate_epoch(model, val_dl, special_symbols,vocab_charges, vocab_pdgs,
             #n_nospe = spe_tokens_mask.shape[-1] - nspe_tokens
             #loss_cont_vec = loss_fn_cont(logits_cont, tgt_out_cont)
             loss_cont_E = loss_fn_cont(logits_cont[...,0], tgt_out_cont[...,0]) #gives log(E_p/E_l)^2
-            loss_cont_E = torch.mean(torch.sum(loss_cont_E[~spe_tokens_mask], dim = -1))
+            loss_cont_E = torch.mean(loss_cont_E[~spe_tokens_mask])
             loss_cont_dir = loss_fn_cont(logits_cont[...,-3:], tgt_out_cont[...,-3:])
             loss_cont_dir = torch.mean(torch.sum(loss_cont_dir[~spe_tokens_mask], dim = -1))
-            loss_cont = weights_loss_cont["E"]*torch.mean(loss_cont_E) + weights_loss_cont["dir"]*loss_cont_dir
+            loss_cont = weights_loss_cont["E"]*loss_cont_E + weights_loss_cont["dir"]*loss_cont_dir
             loss_tokens = loss_fn_tokens(logits_tokens.transpose(-2,-1), tgt_out_tokens)
 
             loss = loss_charges * hyperweights_lossfn[0] + loss_pdg * hyperweights_lossfn[1] + loss_cont*hyperweights_lossfn[2] + loss_tokens * hyperweights_lossfn[-1]
@@ -492,7 +492,7 @@ def validate_epoch(model, val_dl, special_symbols,vocab_charges, vocab_pdgs,
                 loss_epoch_E = 0.
                 loss_epoch_dir = 0.
                 count_log += 1
-                count_log += 1
+            
     #return (loss_epoch / size_batch, loss_epoch_charges / size_batch, loss_epoch_pdgs / size_batch, loss_epoch_cont / size_batch)
     return loss_epoch_tot / size_batch
 
@@ -631,7 +631,7 @@ def train_and_validate(config, args):
         if val_loss_epoch < val_loss_min:
             logging.info("New best Model, saving...")
             torch.save(model.state_dict(), config["dir_results"] + "best_model.pt")
-            val_loss_min = val_loss_min
+            val_loss_min = val_loss_epoch
         logging.info("Saving current model...")
         torch.save(model.state_dict(), config["dir_results"] + f"model_epoch_{i}")
         logging.info(f"{i + 1} epoch done, time: {time_epoch}, val_loss: {val_loss_epoch}, train_loss: {train_loss_epoch}")

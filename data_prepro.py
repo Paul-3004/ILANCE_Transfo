@@ -202,9 +202,13 @@ class CollectionHitsTraining(Dataset):
             self.formatting(feats, labels, special_symbols)
 
             if ntrue_clusters != "all":
+                if isinstance(ntrue_clusters, dict):
+                    for key in ntrue_cluster:
+                        mask_ncluster = self.nclusters_events == ntrue_clusters[key]
+                        mask_pdg = ak.all(self.unique_pd)
                 mask = self.nclusters_events == ntrue_clusters
                 self.feats = self.feats[mask]
-                self.labels = self.labels[mask]
+                self.labels = self.labels[mask][:,:ntrue_clusters + 3]
 
     def _get_data(self,filenames, nfiles):
         if nfiles == 1:
@@ -320,6 +324,7 @@ class CollectionHitsTraining(Dataset):
         dim = ak.num(feats,axis = 1)
         feats_flat_np = ak.flatten(feats).to_numpy()
         feats_flat_torch = torch.from_numpy(feats_flat_np)
+        feats_flat_torch[...,0].log10_()
         self.RMS_normalize(feats_flat_torch[...,0], "E_feat")
         self.RMS_normalize(feats_flat_torch[...,-3:], "pos")
         return ak.unflatten(feats_flat_np, counts = dim)
@@ -459,7 +464,7 @@ class CollectionHitsInference(Dataset):
             if ntrue_clusters != "all":
                 mask = self.nclusters_events == ntrue_clusters
                 self.feats = self.feats[mask]
-                self.labels = self.labels[mask]
+                self.labels = self.labels[mask][:,:ntrue_clusters + 3]
 
     def _get_data(self,filenames, nfiles):
         if nfiles == 1:
@@ -570,6 +575,7 @@ class CollectionHitsInference(Dataset):
         dim = ak.num(feats,axis = 1)
         feats_flat_np = ak.flatten(feats).to_numpy()
         feats_flat_torch = torch.from_numpy(feats_flat_np)
+        feats_flat_torch[...,0].log10_()
         self.RMS_normalize(feats_flat_torch[...,0], "E_feat")
         self.RMS_normalize(feats_flat_torch[...,-3:], "pos")
         return ak.unflatten(feats_flat_np, counts = dim)
@@ -630,7 +636,12 @@ def get_data(dir_path, batch_size, frac_files,model_mode:str, preprocessed: bool
     if model_mode == "training":
         dir_path_train, dir_path_val = dir_path
         data_set_train = CollectionHitsTraining(dir_path_train,special_symbols, frac_files, preprocessed, E_cut, do_tracks, ntrue_clusters)
-        data_set_val = CollectionHitsTraining(dir_path_val, special_symbols, frac_files, preprocessed, E_cut, do_tracks, ntrue_clusters)
+        E_label_RMSNormalizer = data_set_train.E_label_RMS_normalizer
+        E_feats_RMSNormalizer = data_set_train.E_feats_RMS_normalizer
+        pos_feats_RMSNormalizer = data_set_train.pos_feats_RMS_normalizer
+        data_set_val = CollectionHitsInference(dir_path_val, special_symbols,
+                                               E_label_RMSNormalizer, E_feats_RMSNormalizer, pos_feats_RMSNormalizer,
+                                               frac_files,preprocessed, E_cut, do_tracks, ntrue_clusters)
         vocab_charges, vocab_pdgs = data_set_train.vocab_charges, data_set_train.vocab_pdgs
         vocab_charges_val, vocab_pdgs_val = data_set_val.vocab_charges, data_set_val.vocab_pdgs
 
@@ -639,9 +650,6 @@ def get_data(dir_path, batch_size, frac_files,model_mode:str, preprocessed: bool
         if len(vocab_pdgs) < len(vocab_pdgs_val):
             vocab_pdgs = vocab_pdgs_val
 
-        E_label_RMSNormalizer = data_set_train.E_label_RMS_normalizer
-        E_feats_RMSNormalizer = data_set_train.E_feats_RMS_normalizer
-        pos_feats_RMSNormalizer = data_set_train.pos_feats_RMS_normalizer
         return (vocab_charges, vocab_pdgs,
                 special_symbols, E_label_RMSNormalizer, E_feats_RMSNormalizer,pos_feats_RMSNormalizer, 
                 DataLoader(data_set_train, batch_size= batch_size, shuffle = shuffle),
