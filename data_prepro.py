@@ -203,10 +203,10 @@ class CollectionHits(Dataset):
                 feats = feats[:,:,:5]
             else:
                 feats = feats[:,:,:4]
-
+                
             PDGs_mask = np.abs(labels[...,2]) < 1e3
             labels = labels[PDGs_mask]
-
+            #feats.show()
             self.formatting(feats, labels)
 
     def _get_data(self,filenames, nfiles):
@@ -248,6 +248,8 @@ class CollectionHits(Dataset):
             mask_true_cluster = self.select_true_clusters(labels_flat_unique[...,2],dim_count)
             labels_flat_unique = ak.flatten(ak.unflatten(labels_flat_unique,dim_count)[mask_true_cluster])
             dim_count = dim_count[mask_true_cluster]
+            feats[mask_true_cluster].show()
+            print(mask_true_cluster)
             feats = add_special_symbols(self.format_feats(feats[mask_true_cluster]), "feats")
         else:
             feats = add_special_symbols(self.format_feats(feats), "feats")
@@ -330,7 +332,14 @@ class CollectionHits(Dataset):
 
     def format_feats(self, feats):
         dim = ak.num(feats,axis = 1)
-        feats_flat_np = ak.flatten(feats).to_numpy()
+        #feats.show()
+        feats_flat = ak.flatten(feats)
+        #print(ak.num(feats_flat, axis = 0))
+        #print(ak.num(feats_flat, axis = 1))
+        nfeats = ak.num(feats)
+        mask = nfeats != 4
+        #print(ak.count_nonzero(mask))
+        feats_flat_np = ak.to_regular(ak.flatten(feats)).to_numpy()
         feats_flat_torch = torch.from_numpy(feats_flat_np)
         feats_flat_torch[...,0].log10_()
         self.RMS_normalize(feats_flat_torch[...,0], "E_feat")
@@ -393,6 +402,14 @@ class CollectionHits(Dataset):
             if no_event == len(self.ntrue_clusters):
                 raise RuntimeError(f"No true events corresponding to {self.ntrue_clusters} were found")
             return mask
+        elif isinstance(self.ntrue_clusters,int):
+            mask_ncluster = dim_count_np == self.ntrue_clusters
+            if ak.count_nonzero(mask_ncluster) > 0:
+                mask += mask_ncluster
+            else:
+                raise RuntimeError(f"No true events corresponding to {self.ntrue_clusters} were found")
+            return mask
+                                                                                                            
 
     #necessary methods to override
     #called when applying len(), must be an integer (note: same numbers of feats than label)
