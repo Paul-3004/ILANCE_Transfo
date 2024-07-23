@@ -1,0 +1,3 @@
+screen -t 
+$echo I was here
+screen -d

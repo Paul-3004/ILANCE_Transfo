@@ -1,0 +1,62 @@
+#!/bin/bash
+
+# Function to print usage
+usage() {
+  echo "Usage: $0 -p dir1 dir2 dir3 -d int1 int2 int3"
+  exit 1
+}
+
+# Check if no arguments were passed
+if [ $# -eq 0 ]; then
+  usage
+fi
+
+# Initialize arrays to hold directories and integers
+dirs=()
+ints=()
+
+# Parse options
+while getopts ":p:d:" opt; do
+  case ${opt} in
+    p)
+      # Capture directory arguments 
+      ((OPTIND--))
+      while [[ ${OPTIND} -le $# && ! ${!OPTIND} =~ ^- ]]; do
+        dirs+=("${!OPTIND}")
+        ((OPTIND++))
+      done
+      ;;
+    d)
+      ((OPTIND--))
+      while [[ ${OPTIND} -le $# && ! ${!OPTIND} =~ ^- ]]; do
+        ints+=("${!OPTIND}")
+        ((OPTIND++))
+      done
+      ;;
+    \?)
+      echo "Invalid option: -$OPTARG" >&2
+      usage
+      ;;
+    :)
+      echo "Option -$OPTARG requires an argument." >&2
+      usage
+      ;;
+  esac
+done
+
+# Check if the number of directories and integers match
+if [ ${#dirs[@]} -ne ${#ints[@]} ]; then
+  echo "The number of directories and integers must match."
+  echo ${#dirs[@]} 
+  echo ${dirs[@]}
+  echo ${#int[@]} 
+  usage
+fi
+
+# Process each directory and its associated integer
+for ((i=0; i<${#dirs[@]}; i++)); do
+  dir=${dirs[$i]}
+  int=${ints[$i]}
+  echo "Executing: python3 script.py -dir $dir -device $int"
+  screen "python3 /home/wahlen/ILANCE_Transfo/script.py -dir "$dir" -device "$int""
+done

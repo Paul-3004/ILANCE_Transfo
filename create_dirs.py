@@ -31,7 +31,7 @@ def modify_template(template, param_name,param_value, dir_path,ds_path):
     template["path_charges"] = dir_path
     template["path_PDGs"] = dir_path
     template["dir_path_inference"] = os.path.join(ds_path, "test")
-    template["dir_path_train"] = os.path.join(ds_path, "training")
+    template["dir_path_train"] = os.path.join(ds_path, "train")
     template["dir_path_val"] = os.path.join(ds_path, "validation")
 
 def convert_str(values, param_name):

@@ -1,4 +1,5 @@
 from time import time
+import os
 
 import torch
 from torch.nn.functional import normalize
@@ -173,7 +174,7 @@ args:
 
 '''
 def greedy_func(model,src,vocab_charges, ncluster_max: int, special_symbols: dict, nfeats_labels: int = 6, dtype = torch.float32):
-    DEVICE = torch.device(f'cuda:{model.device}' if torch.cuda.is_available() else 'cpu')
+    DEVICE = torch.device(f'{model.device}' if torch.cuda.is_available() else 'cpu')
     with torch.no_grad():
         src = src.to(DEVICE)
         #src_padding_mask = src_padding_mask.to(DEVICE)
@@ -258,19 +259,26 @@ def greedy_func(model,src,vocab_charges, ncluster_max: int, special_symbols: dic
     return clusters_transfo
 
 def inference(config, args, model_type):
+    print("INFERENCE CALLED __________________________-")
     logger = logging.getLogger(__name__)
-    logging.basicConfig(filename= config["dir_results"] + "log_inference.txt", level= logging.INFO)
+    logger.propagate = False
+    logging.basicConfig(filename= os.path.join(config["dir_results"], "log_inference.txt"), level= logging.INFO)
     file_handler = logging.FileHandler(logger.name, mode = 'w')
+    if (logger.hasHandlers()):
+        logger.handlers.clear()
     logger.addHandler(file_handler)
 
     console = logging.StreamHandler()
     console.setLevel(logging.INFO)
-    logging.getLogger().addHandler(console)
+    logger2 = logging.getLogger()
+    if (logger2.hasHandlers()):
+        logger2.handlers.clear()
+    logger2.addHandler(console)
     logging.info("Inference chosen...")
     logging.info("Loading the vocabularies...")
-    vocab_charges = Vocab.from_dict(torch.load(config["path_charges"] + "vocab_charges.pt"))
-    vocab_pdgs = Vocab.from_dict(torch.load(config["path_PDGs"] + "vocab_PDGs.pt"))
-    normalizers = torch.load(config["dir_model"] + "normalizers.pt")
+    vocab_charges = Vocab.from_dict(torch.load(os.path.join(config["path_charges"], "vocab_charges.pt")))
+    vocab_pdgs = Vocab.from_dict(torch.load(os.path.join(config["path_PDGs"], "vocab_PDGs.pt")))
+    normalizers = torch.load(os.path.join(config["dir_model"], "normalizers.pt"))
     E_label_rms_normalizer = normalizers["E_label_RMS_normalizer"]
     E_feats_rms_normalizer = normalizers["E_feats_RMS_normalizer"]
     pos_feats_rms_normalizer = normalizers["pos_feats_RMS_normalizer"]
@@ -278,9 +286,9 @@ def inference(config, args, model_type):
     DEVICE = torch.device(f'cuda:{args.device}' if torch.cuda.is_available() else 'cpu')
     #Loading weights
     if model_type == "best":
-        model.load_state_dict(torch.load(config["dir_model"] + "best_model.pt"))
+        model.load_state_dict(torch.load(os.path.join(config["dir_model"],"best_model.pt")))
     elif isinstance(model_type, int):
-        model.load_state_dict(torch.load(config["dir_model"] + f"model_epoch_{model_type}"))
+        model.load_state_dict(torch.load(os.path.join(config["dir_model"],f"model_epoch_{model_type}")))
     else:
         raise ValueError(f"expected best or int not {model_type}")
         
@@ -296,7 +304,7 @@ def inference(config, args, model_type):
                                                                     False, config["E_cut"], config["shuffle"], config["do_tracks"],
                                                                     config["ntrue_clusters"])
     logging.info("Saving normalizer...")
-    torch.save(E_label_RMS_normalizer, config["dir_results"] + "E_RMS_normalizer.pt")
+    torch.save(E_label_RMS_normalizer, os.path.join(config["dir_results"],"E_RMS_normalizer.pt"))
     logging.info("Going to inference now")
     pred = []
     labels = []
@@ -312,9 +320,9 @@ def inference(config, args, model_type):
         logging.info(f"Batch done in {delta_t} seconds")
     
     output = torch.cat(pred, dim = 0)
-    torch.save(output, config["dir_results"] + "prediction.pt")
+    torch.save(output, os.path.join(config["dir_results"], "prediction.pt"))
     labels = torch.cat(labels, dim = 0)
-    torch.save(labels, config["dir_results"] + "labels.pt")
+    torch.save(labels, os.path.join(config["dir_results"], "labels.pt"))
 
 
 #def compute_loss(model, special_symbols,loss_funcs,hyperweights_loss_tot, weights_loss_cont,nlog_period_epoch,loss_evo_epoch )
@@ -324,7 +332,7 @@ def train_epoch(model, optim, train_dl, special_symbols,vocab_charges, vocab_pdg
                 hyperweights_lossfn, loss_fn_charges, loss_fn_pdg,loss_fn_cont, loss_fn_tokens,
                 nlog_period_epoch, loss_evo, epoch, weights_loss_cont):
     model.train() #setting model into train mode
-
+    DEVICE = torch.device(f'{model.device}' if torch.cuda.is_available() else 'cpu')
     period = nlog_period_epoch["period"]
     nlog_epoch = nlog_period_epoch["nlog"]
     loss_epoch_tot = 0.
@@ -417,7 +425,7 @@ def validate_epoch(model, val_dl, special_symbols,vocab_charges, vocab_pdgs,
                    hyperweights_lossfn, loss_fn_charges, loss_fn_pdg,loss_fn_cont, loss_fn_tokens,
                    nlog_period_epoch, loss_evo,epoch, weights_loss_cont):  
     model.eval() #setting model into train mode
-
+    DEVICE = torch.device(f'{model.device}' if torch.cuda.is_available() else 'cpu')
     period = nlog_period_epoch["period"]
     nlog_epoch = nlog_period_epoch["nlog"]
     loss_epoch_tot = 0.
@@ -506,7 +514,7 @@ def validate_epoch(model, val_dl, special_symbols,vocab_charges, vocab_pdgs,
 def train_and_validate(config, args):
 
     logger = logging.getLogger(__name__)
-    logging.basicConfig(filename= config["dir_results"] + "log.txt", level= logging.INFO)
+    logging.basicConfig(filename= os.path.join(config["dir_results"],"log.txt"), level= logging.INFO)
     file_handler = logging.FileHandler(logger.name, mode = 'w')
     logger.addHandler(file_handler)
     
@@ -523,17 +531,17 @@ def train_and_validate(config, args):
                                                                                               E_cut= config["E_cut"],
                                                                                               shuffle = config["shuffle"],
                                                                                               ntrue_clusters= config["ntrue_clusters"])
-    torch.save(vocab_charges.vocab, config["dir_results"] + "vocab_charges.pt")
-    torch.save(vocab_pdgs.vocab, config["dir_results"] + "vocab_PDGs.pt")
+    torch.save(vocab_charges.vocab, os.path.join(config["dir_results"], "vocab_charges.pt"))
+    torch.save(vocab_pdgs.vocab, os.path.join(config["dir_results"],"vocab_PDGs.pt"))
     torch.save({"E_label_RMS_normalizer": E_label_rms_normalizer,
                 "E_feats_RMS_normalizer": E_feats_rms_normalizer, 
-                "pos_feats_RMS_normalizer": pos_feats_rms_normalizer}, config["dir_results"] + "normalizers.pt")
+                "pos_feats_RMS_normalizer": pos_feats_rms_normalizer},os.path.join(config["dir_results"],"normalizers.pt"))
     
     logging.info("Loaded the data and saved vocabularies")
 
     DEVICE = torch.device(f'cuda:{args.device}' if torch.cuda.is_available() else 'cpu')
     print(f"memory on CUDA, model not yet created: {torch.cuda.memory_allocated(DEVICE)}")
-    model = create_model(config, args.model,len(vocab_charges), len(vocab_pdgs))
+    model = create_model(config, args,len(vocab_charges), len(vocab_pdgs))
     print(f"Created model on CUDA {model.device}, memory allocated: {torch.cuda.memory_allocated(DEVICE) / 1e9} GB")
     nparams = sum(param.numel() for param in model.parameters())
     print(f"number of parameters: {nparams}")
@@ -638,13 +646,13 @@ def train_and_validate(config, args):
 
         if val_loss_epoch < val_loss_min:
             logging.info("New best Model, saving...")
-            torch.save(model.state_dict(), config["dir_results"] + "best_model.pt")
+            torch.save(model.state_dict(), os.path.join(config["dir_results"],"best_model.pt"))
             val_loss_min = val_loss_epoch
         logging.info("Saving current model...")
-        torch.save(model.state_dict(), config["dir_results"] + f"model_epoch_{i}")
+        torch.save(model.state_dict(), os.path.join(config["dir_results"], f"model_epoch_{i}"))
         logging.info(f"{i + 1} epoch done, time: {time_epoch}, val_loss: {val_loss_epoch}, train_loss: {train_loss_epoch}")
     
-        torch.save(losses_evolution, config["dir_results"] + f"losses_epoch_{i}.pt")
+        torch.save(losses_evolution, os.path.join(config["dir_results"], f"losses_epoch_{i}.pt"))
     logging.info("Finished all epochs and saved the losses")
 
 if __name__ == "__main__":
@@ -660,7 +668,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     DEVICE = torch.device(f'cuda:{args.device}' if torch.cuda.is_available() else 'cpu')
 
-    with open(args.config_path + "ConfigFile.json") as f:
+    with open(os.path.join(args.config_path, "ConfigFile.json")) as f:
         config = json.load(f)
 
     if args.inference:

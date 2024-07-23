@@ -182,7 +182,8 @@ class CollectionHits(Dataset):
         else:
             filenames = list(sorted(glob.iglob(self.dir_path + '/*.h5')))
             nfiles = ceil(self.frac_files * len(filenames))
-            #print(nfiles)
+            print(nfiles)
+            print(self.frac_files)
             print("NEW VERSION")
             feats, labels = self._get_data(filenames, nfiles)
                  
