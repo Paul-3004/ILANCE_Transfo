@@ -45,11 +45,12 @@ def translate(input, vocab_charges, vocab_pdgs, rms_normalizer):
     input[...,1] = vocab_pdgs.indices_to_tokens(input[...,1])
     input[...,2] = translate_E(input[...,2], rms_normalizer)
 
-def create_model(config, version, vcharges_size, vpdgs_size):
+def create_model(config, args, vcharges_size, vpdgs_size):
+    DEVICE = torch.device(f'cuda:{args.device}' if torch.cuda.is_available() else 'cpu')
     if config["dtype"] == "torch.float32":
         dtype = torch.float32
     
-    #version = args.model
+    version = args.model
     if version == 1 or version == 2:
         if version == 1:
             decoder = None
@@ -172,6 +173,7 @@ args:
 
 '''
 def greedy_func(model,src,vocab_charges, ncluster_max: int, special_symbols: dict, nfeats_labels: int = 6, dtype = torch.float32):
+    DEVICE = torch.device(f'cuda:{model.device}' if torch.cuda.is_available() else 'cpu')
     with torch.no_grad():
         src = src.to(DEVICE)
         #src_padding_mask = src_padding_mask.to(DEVICE)
@@ -255,7 +257,7 @@ def greedy_func(model,src,vocab_charges, ncluster_max: int, special_symbols: dic
     clusters_transfo = add_pad_final(clusters_transfo, pad, ncluster_max)
     return clusters_transfo
 
-def inference(config, args):
+def inference(config, args, model_type):
     logger = logging.getLogger(__name__)
     logging.basicConfig(filename= config["dir_results"] + "log_inference.txt", level= logging.INFO)
     file_handler = logging.FileHandler(logger.name, mode = 'w')
@@ -268,15 +270,20 @@ def inference(config, args):
     logging.info("Loading the vocabularies...")
     vocab_charges = Vocab.from_dict(torch.load(config["path_charges"] + "vocab_charges.pt"))
     vocab_pdgs = Vocab.from_dict(torch.load(config["path_PDGs"] + "vocab_PDGs.pt"))
-    normalizers = torch.load(config["dir_results"] + "normalizers.pt")
+    normalizers = torch.load(config["dir_model"] + "normalizers.pt")
     E_label_rms_normalizer = normalizers["E_label_RMS_normalizer"]
     E_feats_rms_normalizer = normalizers["E_feats_RMS_normalizer"]
     pos_feats_rms_normalizer = normalizers["pos_feats_RMS_normalizer"]
-    model = create_model(config, args.model, len(vocab_charges), len(vocab_pdgs))
-
+    model = create_model(config, args, len(vocab_charges), len(vocab_pdgs))
+    DEVICE = torch.device(f'cuda:{args.device}' if torch.cuda.is_available() else 'cpu')
     #Loading weights
-    #model.load_state_dict(torch.load(config["dir_model"] + "best_model.pt"))
-    model.load_state_dict(torch.load(config["dir_model"] + "model_epoch_9"))
+    if model_type == "best":
+        model.load_state_dict(torch.load(config["dir_model"] + "best_model.pt"))
+    elif isinstance(model_type, int):
+        model.load_state_dict(torch.load(config["dir_model"] + f"model_epoch_{model_type}"))
+    else:
+        raise ValueError(f"expected best or int not {model_type}")
+        
     model.eval()
     logging.info(f"Model created on {model.device}, now loading the source")
 
@@ -524,6 +531,7 @@ def train_and_validate(config, args):
     
     logging.info("Loaded the data and saved vocabularies")
 
+    DEVICE = torch.device(f'cuda:{args.device}' if torch.cuda.is_available() else 'cpu')
     print(f"memory on CUDA, model not yet created: {torch.cuda.memory_allocated(DEVICE)}")
     model = create_model(config, args.model,len(vocab_charges), len(vocab_pdgs))
     print(f"Created model on CUDA {model.device}, memory allocated: {torch.cuda.memory_allocated(DEVICE) / 1e9} GB")
@@ -647,6 +655,7 @@ if __name__ == "__main__":
     parser.add_argument("-config_path", type = str, help = "Directory of ConfigFile")
     parser.add_argument("-device", type = int, help = "Number of cuda device to use")
     parser.add_argument("-model", type = int, help = "Number of model implementation to use")
+    parser.add_argument("-me", help = "Epoch of model to use")
 
     args = parser.parse_args()
     DEVICE = torch.device(f'cuda:{args.device}' if torch.cuda.is_available() else 'cpu')
@@ -655,7 +664,7 @@ if __name__ == "__main__":
         config = json.load(f)
 
     if args.inference:
-        inference(config,args)
+        inference(config,args, args.me)
     else:
         train_and_validate(config,args)
 
