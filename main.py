@@ -546,7 +546,12 @@ def train_and_validate(config, args):
     nparams = sum(param.numel() for param in model.parameters())
     print(f"number of parameters: {nparams}")
     logging.info("Created model, computing logging frequencies...")
+
     optim = torch.optim.Adam(model.parameters(), lr = config["lr"])
+    scheduler = None
+    if config["scheduler"]:
+        scheduler = torch.optim.lr_scheduler.StepLR(optim,2,0.5)
+    
     loss_fn_charges = nn.CrossEntropyLoss(reduction ='mean')
     loss_fn_pdgs = nn.CrossEntropyLoss(reduction ='mean')
     loss_fn_cont = nn.MSELoss(reduction = 'none')
@@ -607,6 +612,9 @@ def train_and_validate(config, args):
                                        loss_evo = losses_evolution,
                                        epoch = i,
                                        weights_loss_cont=config["weights_loss_cont"])
+        if scheduler is not None:
+            scheduler.step()
+            
         time_epoch = time() - start_time 
         logging.info("Finished training for one epoch, going to valiation")
         # val_loss_epoch, charges_val, pdgs_val,cont_val = validate_epoch(model,

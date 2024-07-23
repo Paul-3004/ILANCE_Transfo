@@ -1,5 +1,5 @@
 from time import time
-
+import os
 import torch
 from torch.nn.functional import normalize
 from torch.nn.modules.transformer import TransformerDecoder, TransformerDecoderLayer
@@ -8,7 +8,7 @@ import torch.optim as optim
 import numpy as np
 from math import ceil
 
-from data_prepro import create_mask, get_data, Vocab
+from data_prepro import create_mask, get_data, Vocab, get_data_inference
 from model import ClustersFinder, CustomDecoderLayer, CustomDecoder, ClustersFinderTracks, Embedder, TransfoDoubleDecoder
 from argparse import ArgumentParser
 import json
@@ -45,7 +45,9 @@ def translate(input, vocab_charges, vocab_pdgs, rms_normalizer):
     input[...,1] = vocab_pdgs.indices_to_tokens(input[...,1])
     input[...,2] = translate_E(input[...,2], rms_normalizer)
 
-def create_model(config, version, vcharges_size, vpdgs_size):
+def create_model(config, args, vcharges_size, vpdgs_size):
+    DEVICE = torch.device(f'cuda:{args.device}' if torch.cuda.is_available() else 'cpu')
+    version = args.model
     if config["dtype"] == "torch.float32":
         dtype = torch.float32
 
@@ -130,6 +132,7 @@ args:
 
 '''
 def greedy_func(model,src,tracks,vocab_charges, ncluster_max: int, special_symbols: dict, nfeats_labels: int = 6, dtype = torch.float32):
+    DEVICE = torch.device(f'{model.device}' if torch.cuda.is_available() else 'cpu')
     with torch.no_grad():
         src = src.to(DEVICE)
         tracks = tracks.to(DEVICE)
@@ -215,37 +218,52 @@ def greedy_func(model,src,tracks,vocab_charges, ncluster_max: int, special_symbo
     clusters_transfo = add_pad_final(clusters_transfo, pad, ncluster_max)
     return clusters_transfo
 
-def inference(config, args):
+def inference(config, args, model_type):
     logger = logging.getLogger(__name__)
-    logging.basicConfig(filename= config["dir_results"] + "log_inference.txt", level= logging.INFO)
+    logger.propagate = False
+    logging.basicConfig(filename= os.path.join(config["dir_results"], "log_inference.txt"), level= logging.INFO)
     file_handler = logging.FileHandler(logger.name, mode = 'w')
+    if (logger.hasHandlers()):
+        logger.handlers.clear()
     logger.addHandler(file_handler)
 
     console = logging.StreamHandler()
     console.setLevel(logging.INFO)
-    logging.getLogger().addHandler(console)
+    logger2 = logging.getLogger()
+    if (logger2.hasHandlers()):
+        logger2.handlers.clear()
+    logger2.addHandler(console)
     logging.info("Inference chosen...")
     logging.info("Loading the vocabularies...")
-    vocab_charges = Vocab.from_dict(torch.load(config["path_charges"] + "vocab_charges.pt"))
-    vocab_pdgs = Vocab.from_dict(torch.load(config["path_PDGs"] + "vocab_PDGs.pt"))
-    model = create_model(config, args.model, len(vocab_charges), len(vocab_pdgs))
-
+    vocab_charges = Vocab.from_dict(torch.load(os.path.join(config["path_charges"], "vocab_charges.pt")))
+    vocab_pdgs = Vocab.from_dict(torch.load(os.path.join(config["path_PDGs"], "vocab_PDGs.pt")))
+    normalizers = torch.load(os.path.join(config["dir_model"], "normalizers.pt"))
+    E_label_rms_normalizer = normalizers["E_label_RMS_normalizer"]
+    E_feats_rms_normalizer = normalizers["E_feats_RMS_normalizer"]
+    pos_feats_rms_normalizer = normalizers["pos_feats_RMS_normalizer"]
+    model = create_model(config, args, len(vocab_charges), len(vocab_pdgs))
+    DEVICE = torch.device(f'cuda:{args.device}' if torch.cuda.is_available() else 'cpu')
     #Loading weights
-    model.load_state_dict(torch.load(config["dir_model"] + "best_model.pt"))
-    #model.load_state_dict(torch.load(config["dir_model"] + "model_epoch_4"))
+    if model_type == "best":
+        model.load_state_dict(torch.load(os.path.join(config["dir_model"],"best_model.pt")))
+    elif isinstance(model_type, int):
+        model.load_state_dict(torch.load(os.path.join(config["dir_model"],f"model_epoch_{model_type}")))
+    else:
+        raise ValueError(f"expected best or int not {model_type}")
+        
     model.eval()
     logging.info(f"Model created on {model.device}, now loading the source")
 
     if config["dtype"] == "torch.float32":
         dtype = torch.float32
     
-    
-    special_symbols, E_label_RMS_normalizer, src_loader = get_data((config["dir_path_inference"], ), 
-                                                                    config["batch_size_test"], 
-                                                                    config["frac_files_test"], "inference", 
-                                                                    False, config["E_cut"], config["shuffle"], config["do_tracks"])
+    special_symbols, E_label_RMS_normalizer, src_loader = get_data_inference((config["dir_path_inference"], ), 
+                                                                    config["batch_size_test"], config["frac_files_test"],
+                                                                    E_label_rms_normalizer, E_feats_rms_normalizer, pos_feats_rms_normalizer, 
+                                                                    False, config["E_cut"], config["shuffle"], config["do_tracks"],
+                                                                    config["ntrue_clusters"])
     logging.info("Saving normalizer...")
-    torch.save(E_label_RMS_normalizer, config["dir_results"] + "E_RMS_normalizer.pt")
+    torch.save(E_label_RMS_normalizer, os.path.join(config["dir_results"],"E_RMS_normalizer.pt"))
     logging.info("Going to inference now")
     pred = []
     labels = []
@@ -261,19 +279,19 @@ def inference(config, args):
         logging.info(f"Batch done in {delta_t} seconds")
     
     output = torch.cat(pred, dim = 0)
-    torch.save(output, config["dir_results"] + "prediction.pt")
+    torch.save(output, os.path.join(config["dir_results"], "prediction.pt"))
     labels = torch.cat(labels, dim = 0)
-    torch.save(labels, config["dir_results"] + "labels.pt")
+    torch.save(labels, os.path.join(config["dir_results"], "labels.pt"))
 
 
 
 #train the model for one epoch
 #src: input hits from simulation, tgt: MC truth clusters 
-def train_epoch(model, optim, train_dl, special_symbols,vocab_charges, vocab_pdgs, E_rms_normalizer,
+def train_epoch(model, optim, train_dl, special_symbols,vocab_charges, vocab_pdgs,
                 hyperweights_lossfn, loss_fn_charges, loss_fn_pdg,loss_fn_cont, loss_fn_tokens,
-                nlog_period_epoch, loss_evo, epoch):
+                nlog_period_epoch, loss_evo, epoch, weights_loss_cont):
     model.train() #setting model into train mode
-
+    DEVICE = torch.device(f'{model.device}' if torch.cuda.is_available() else 'cpu')
     period = nlog_period_epoch["period"]
     nlog_epoch = nlog_period_epoch["nlog"]
     loss_epoch_tot = 0.
@@ -282,6 +300,8 @@ def train_epoch(model, optim, train_dl, special_symbols,vocab_charges, vocab_pdg
     loss_epoch_pdgs = 0.0
     loss_epoch_cont = 0.0
     loss_epoch_tokens = 0.
+    loss_epoch_E = 0.0
+    loss_epoch_dir = 0.0
     count_log = 0
     for i,(src,tgt, tracks) in enumerate(train_dl):
         src = src.to(DEVICE)
@@ -313,11 +333,16 @@ def train_epoch(model, optim, train_dl, special_symbols,vocab_charges, vocab_pdg
         #Computing the losses
         loss_charges = loss_fn_charges(logits_charges.transpose(dim0 = -2, dim1 = -1), tgt_out_charges)
         loss_pdg = loss_fn_pdg(logits_pdg.transpose(dim0 = -2, dim1 = -1), tgt_out_pdg)
-        loss_cont_vec = loss_fn_cont(logits_cont, tgt_out_cont)
         loss_tokens = loss_fn_tokens(logits_tokens.transpose(-2,-1), tgt_out_tokens)
+        #loss_cont_vec = loss_fn_cont(logits_cont, tgt_out_cont)
+        loss_cont_E = loss_fn_cont(logits_cont[...,0], tgt_out_cont[...,0]) #gives log(E_p/E_l)^2
+        loss_cont_E = torch.mean(loss_cont_E[~spe_tokens_mask])
+        loss_cont_dir = loss_fn_cont(logits_cont[...,-3:], tgt_out_cont[...,-3:])
+        loss_cont_dir = torch.mean(torch.sum(loss_cont_dir[~spe_tokens_mask], dim = -1))
+        loss_cont = weights_loss_cont["E"]*loss_cont_E + weights_loss_cont["dir"]*loss_cont_dir
         #nspe_tokens = torch.count_nonzero(spe_tokens_mask, dim = -1)
         #n_nospe = spe_tokens_mask.shape[-1] - nspe_tokens
-        loss_cont = torch.mean(torch.sum(loss_cont_vec[~spe_tokens_mask], dim = -1))
+        #loss_cont = torch.mean(torch.sum(loss_cont_vec[~spe_tokens_mask], dim = -1))
         
         loss = loss_charges * hyperweights_lossfn[0] + loss_pdg * hyperweights_lossfn[1] + loss_cont*hyperweights_lossfn[2] + loss_tokens * hyperweights_lossfn[-1]
         loss.backward()
@@ -330,6 +355,8 @@ def train_epoch(model, optim, train_dl, special_symbols,vocab_charges, vocab_pdg
         loss_epoch_pdgs += loss_pdg.item()
         loss_epoch_cont += loss_cont.item()
         loss_epoch_tokens += loss_tokens.item()
+        loss_epoch_E += loss_cont_E.item()
+        loss_epoch_dir += loss_cont_dir.item()
         size_batch = len(train_dl)
 
         if (i + 1) % period == 0:
@@ -340,22 +367,26 @@ def train_epoch(model, optim, train_dl, special_symbols,vocab_charges, vocab_pdg
             loss_evo["pdgs_train"][nlog_epoch *epoch + count_log] = loss_epoch_pdgs / period
             loss_evo["cont_train"][nlog_epoch *epoch + count_log] = loss_epoch_cont / period
             loss_evo["tokens_train"][nlog_epoch *epoch + count_log] = loss_epoch_tokens / period
+            loss_evo["cont_E_train"][nlog_epoch *epoch + count_log] = loss_epoch_E / period
+            loss_evo["cont_dir_train"][nlog_epoch *epoch + count_log] = loss_epoch_dir / period
 
             loss_epoch = 0.
             loss_epoch_charges = 0.
             loss_epoch_pdgs = 0.
             loss_epoch_cont = 0.
             loss_epoch_tokens = 0.
+            loss_epoch_E = 0.
+            loss_epoch_dir = 0.
             count_log += 1
         #print(f"Memory allocated end of batch: {torch.cuda.memory_allocated(DEVICE) / 1e9} GB")
         #return (loss_epoch / size_batch, loss_epoch_charges / size_batch, loss_epoch_pdgs / size_batch, loss_epoch_cont / size_batch)
     return loss_epoch_tot / size_batch
 
-def validate_epoch(model, val_dl, special_symbols,vocab_charges, vocab_pdgs, E_rms_normalizer,
+def validate_epoch(model, val_dl, special_symbols,vocab_charges, vocab_pdgs,
                    hyperweights_lossfn, loss_fn_charges, loss_fn_pdg,loss_fn_cont, loss_fn_tokens,
-                   nlog_period_epoch, loss_evo,epoch):  
-    model.eval() #setting model into train mode
-
+                   nlog_period_epoch, loss_evo,epoch, weights_loss_cont):  
+    model.eval()
+    DEVICE = torch.device(f'{model.device}' if torch.cuda.is_available() else 'cpu')
     period = nlog_period_epoch["period"]
     nlog_epoch = nlog_period_epoch["nlog"]
     loss_epoch_tot = 0.
@@ -364,6 +395,8 @@ def validate_epoch(model, val_dl, special_symbols,vocab_charges, vocab_pdgs, E_r
     loss_epoch_pdgs = 0.0
     loss_epoch_cont = 0.0
     loss_epoch_tokens = 0.
+    loss_epoch_E = 0.0
+    loss_epoch_dir = 0.0
     count_log = 0
     for i, (src,tgt, tracks) in enumerate(val_dl):
         src = src.to(DEVICE)
@@ -394,11 +427,16 @@ def validate_epoch(model, val_dl, special_symbols,vocab_charges, vocab_pdgs, E_r
             #Computing the losses
             loss_charges = loss_fn_charges(logits_charges.transpose(dim0 = -2, dim1 = -1), tgt_out_charges)
             loss_pdg = loss_fn_pdg(logits_pdg.transpose(dim0 = -2, dim1 = -1), tgt_out_pdg)
-            loss_cont_vec = loss_fn_cont(logits_cont, tgt_out_cont)
             loss_tokens = loss_fn_tokens(logits_tokens.transpose(-2,-1), tgt_out_tokens)
             #nspe_tokens = torch.count_nonzero(spe_tokens_mask, dim = -1)
             #n_nospe = spe_tokens_mask.shape[-1] - nspe_tokens
-            loss_cont = torch.mean(torch.sum(loss_cont_vec[~spe_tokens_mask], dim = -1))
+            #loss_cont_vec = loss_fn_cont(logits_cont, tgt_out_cont)
+            loss_cont_E = loss_fn_cont(logits_cont[...,0], tgt_out_cont[...,0]) #gives log(E_p/E_l)^2
+            loss_cont_E = torch.mean(loss_cont_E[~spe_tokens_mask])
+            loss_cont_dir = loss_fn_cont(logits_cont[...,-3:], tgt_out_cont[...,-3:])
+            loss_cont_dir = torch.mean(torch.sum(loss_cont_dir[~spe_tokens_mask], dim = -1))
+            loss_cont = weights_loss_cont["E"]*loss_cont_E + weights_loss_cont["dir"]*loss_cont_dir
+            loss_tokens = loss_fn_tokens(logits_tokens.transpose(-2,-1), tgt_out_tokens)
 
             loss = loss_charges * hyperweights_lossfn[0] + loss_pdg * hyperweights_lossfn[1] + loss_cont*hyperweights_lossfn[2] + loss_tokens * hyperweights_lossfn[-1]
 
@@ -409,6 +447,8 @@ def validate_epoch(model, val_dl, special_symbols,vocab_charges, vocab_pdgs, E_r
             loss_epoch_pdgs += loss_pdg.item()
             loss_epoch_cont += loss_cont.item()
             loss_epoch_tokens += loss_tokens.item()
+            loss_epoch_E += loss_cont_E.item()
+            loss_epoch_dir += loss_cont_dir.item()
             size_batch = len(val_dl)
 
             if (i + 1) % period == 0:
@@ -419,20 +459,23 @@ def validate_epoch(model, val_dl, special_symbols,vocab_charges, vocab_pdgs, E_r
                 loss_evo["pdgs_val"][nlog_epoch *epoch + count_log] = loss_epoch_pdgs / period
                 loss_evo["cont_val"][nlog_epoch *epoch + count_log] = loss_epoch_cont / period
                 loss_evo["tokens_val"][nlog_epoch *epoch + count_log] = loss_epoch_tokens / period
+                loss_evo["cont_E_val"][nlog_epoch *epoch + count_log] = loss_epoch_E / period
+                loss_evo["cont_dir_val"][nlog_epoch *epoch + count_log] = loss_epoch_dir / period
 
                 loss_epoch = 0.
                 loss_epoch_charges = 0.
                 loss_epoch_pdgs = 0.
                 loss_epoch_cont = 0.
                 loss_epoch_tokens = 0.
+                loss_epoch_E = 0.
+                loss_epoch_dir = 0.
                 count_log += 1
     #return (loss_epoch / size_batch, loss_epoch_charges / size_batch, loss_epoch_pdgs / size_batch, loss_epoch_cont / size_batch)
     return loss_epoch_tot / size_batch
 
 def train_and_validate(config, args):
-
     logger = logging.getLogger(__name__)
-    logging.basicConfig(filename= config["dir_results"] + "log.txt", level= logging.INFO)
+    logging.basicConfig(filename= os.path.join(config["dir_results"],"log.txt"), level= logging.INFO)
     file_handler = logging.FileHandler(logger.name, mode = 'w')
     logger.addHandler(file_handler)
     
@@ -441,26 +484,35 @@ def train_and_validate(config, args):
     logging.getLogger().addHandler(console)
 
     logging.info("Getting the training data from" +config["dir_path_train"])
-    vocab_charges, vocab_pdgs, special_symbols, E_rms_normalizer, train_dl, val_dl = get_data(dir_path = (config["dir_path_train"], config["dir_path_val"]), 
+    vocab_charges, vocab_pdgs, special_symbols, E_label_rms_normalizer, E_feats_rms_normalizer, pos_feats_rms_normalizer, train_dl, val_dl = get_data(dir_path = (config["dir_path_train"], config["dir_path_val"]), 
                                                                                               batch_size = config["batch_size"], 
                                                                                               frac_files = config["frac_files"],
                                                                                               model_mode = "training",
                                                                                               preprocessed= config["preprocessed"],
                                                                                               E_cut= config["E_cut"],
                                                                                               shuffle = config["shuffle"],
-                                                                                              do_tracks= config["do_tracks"])
-    torch.save(vocab_charges.vocab, config["dir_results"] + "vocab_charges.pt")
-    torch.save(vocab_pdgs.vocab, config["dir_results"] + "vocab_PDGs.pt")
+                                                                                              ntrue_clusters= config["ntrue_clusters"])
+    torch.save(vocab_charges.vocab, os.path.join(config["dir_results"], "vocab_charges.pt"))
+    torch.save(vocab_pdgs.vocab, os.path.join(config["dir_results"],"vocab_PDGs.pt"))
+    torch.save({"E_label_RMS_normalizer": E_label_rms_normalizer,
+                "E_feats_RMS_normalizer": E_feats_rms_normalizer, 
+                "pos_feats_RMS_normalizer": pos_feats_rms_normalizer},os.path.join(config["dir_results"],"normalizers.pt"))
     
     logging.info("Loaded the data and saved vocabularies")
 
+    DEVICE = torch.device(f'cuda:{args.device}' if torch.cuda.is_available() else 'cpu')
     print(f"memory on CUDA, model not yet created: {torch.cuda.memory_allocated(DEVICE)}")
-    model = create_model(config, args.model,len(vocab_charges), len(vocab_pdgs))
+    model = create_model(config, args,len(vocab_charges), len(vocab_pdgs))
     print(f"Created model on CUDA {model.device}, memory allocated: {torch.cuda.memory_allocated(DEVICE) / 1e9} GB")
     nparams = sum(param.numel() for param in model.parameters())
     print(f"number of parameters: {nparams}")
     logging.info("Created model, computing logging frequencies...")
+
     optim = torch.optim.Adam(model.parameters(), lr = config["lr"])
+    scheduler = None
+    if config["scheduler"]:
+        scheduler = torch.optim.lr_scheduler.StepLR(optim,2,0.5)
+    
     loss_fn_charges = nn.CrossEntropyLoss(reduction ='mean')
     loss_fn_pdgs = nn.CrossEntropyLoss(reduction ='mean')
     loss_fn_cont = nn.MSELoss(reduction = 'none')
@@ -483,10 +535,14 @@ def train_and_validate(config, args):
                         "pdgs_train": np.zeros(nloss_train),
                         "cont_train": np.zeros(nloss_train),
                         "tokens_train": np.zeros(nloss_train),
+                        "cont_E_train": np.zeros(nloss_train),
+                        "cont_dir_train": np.zeros(nloss_train),
                         "charges_val": np.zeros(nloss_val),
                         "pdgs_val": np.zeros(nloss_val),
                         "cont_val": np.zeros(nloss_val),
-                        "tokens_val": np.zeros(nloss_val)}
+                        "tokens_val": np.zeros(nloss_val),
+                        "cont_E_val": np.zeros(nloss_val),
+                        "cont_dir_val": np.zeros(nloss_val)}
     logging.info(f"Logging frequencies computed, nlog_epoch modified as: {nlog_epoch} to {nlog_period_train['nlog']}. Number of losses that will be recorded is thus: {nloss_train} for the training set and {nloss_val}")
     logging.info("Starting training...")
     for i in range(nepoch):
@@ -509,14 +565,17 @@ def train_and_validate(config, args):
                                        special_symbols = special_symbols,
                                        vocab_charges = vocab_charges,
                                        vocab_pdgs= vocab_pdgs,
-                                       E_rms_normalizer = E_rms_normalizer,
                                        loss_fn_charges = loss_fn_charges,
                                        loss_fn_pdg= loss_fn_pdgs,
                                        loss_fn_cont= loss_fn_cont,
                                        loss_fn_tokens= loss_fn_tokens,
                                        nlog_period_epoch = nlog_period_train,
                                        loss_evo = losses_evolution,
-                                       epoch = i)
+                                       epoch = i,
+                                       weights_loss_cont=config["weights_loss_cont"])
+        if scheduler is not None:
+            scheduler.step()
+
         time_epoch = time() - start_time 
         logging.info("Finished training for one epoch, going to valiation")
         # val_loss_epoch, charges_val, pdgs_val,cont_val = validate_epoch(model,
@@ -535,24 +594,14 @@ def train_and_validate(config, args):
                                        special_symbols = special_symbols,
                                        vocab_charges = vocab_charges,
                                        vocab_pdgs= vocab_pdgs,
-                                       E_rms_normalizer = E_rms_normalizer,
                                        loss_fn_charges = loss_fn_charges,
                                        loss_fn_pdg= loss_fn_pdgs,
                                        loss_fn_cont= loss_fn_cont,
                                        loss_fn_tokens= loss_fn_tokens,
                                        nlog_period_epoch = nlog_period_val,
                                         loss_evo = losses_evolution,
-                                        epoch = i) 
-
-        # losses_evolution["train"][i] = train_loss_epoch
-        # losses_evolution["val"][i] = val_loss_epoch
-        # losses_evolution["time"][i] = time_epoch
-        # losses_evolution["charges_train"][i] = charges_train
-        # losses_evolution["pdgs_train"][i] = pdgs_train
-        # losses_evolution["cont_train"][i] = cont_train
-        # losses_evolution["charges_val"][i] = charges_val
-        # losses_evolution["pdgs_val"][i] = pdgs_val
-        # losses_evolution["cont_val"][i] = cont_val
+                                        epoch = i,
+                                        weights_loss_cont=config["weights_loss_cont"]) 
 
         if val_loss_epoch < val_loss_min:
             logging.info("New best Model, saving...")
@@ -581,7 +630,7 @@ if __name__ == "__main__":
         config = json.load(f)
 
     if args.inference:
-        inference(config,args)
+        inference(config,args,args.me)
     else:
         train_and_validate(config,args)
 

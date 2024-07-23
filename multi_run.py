@@ -6,6 +6,15 @@ import torch
 from main import train_and_validate, inference
 DEVICE = torch.device('cuda:5' if torch.cuda.is_available() else 'cpu')
 
+def set_fracfiles(config):
+    dir_path_train = config["dir_path_train"]
+    tail, train = os.path.split(dir_path_train)
+    tail, ds = os.path.split(tail)
+    if ds == "ntau_10to100GeV_10":
+        config["frac_files_test"] = 0.02/16
+    else:
+        config["frac_files_test"] = 0.1
+
 def create_dir(root_dir_path, model_epoch, dataset):
     dir_name = os.path.join(root_dir_path, "res_model_") 
     if isinstance(model_epoch,str):
@@ -22,6 +31,9 @@ def create_dir(root_dir_path, model_epoch, dataset):
 
 def run_inference(config, args,model):
     dir_res_original = config["dir_results"]
+    frac_test_original = config["frac_files_test"]
+    path_inference_original = config["dir_path_inference"]
+
     dir_res = create_dir(config["dir_results"], model,"test")
     config["dir_results"] = dir_res
     inference(config,args,model)
@@ -31,9 +43,13 @@ def run_inference(config, args,model):
         dir_res = create_dir(config["dir_results"], model, "train")
         config["dir_results"] = dir_res
         config["dir_path_inference"] = config["dir_path_train"]
+        set_fracfiles(config)
         inference(config,args,model)
-        print(f"inference on {dir_res} with model epoch {model} done")
+        print(f"inference on {config["dir_path_inference"]} with model epoch {model} saved in {dir_res}")
+    
     config["dir_results"] = dir_res_original
+    config["dir_path_inference"] = path_inference_original
+    config["frac_files_test"] = frac_test_original
 
 
 if __name__ == "__main__":
