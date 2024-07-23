@@ -7,14 +7,14 @@
     "path_PDGs": "./Results/gamma_1_MSE/70cont_128/",
     "dir_path_train":  "/data/suehara/mldata/pfa/gamma_10to100GeV_1/training",
     "dir_path_val":  "/data/suehara/mldata/pfa/gamma_10to100GeV_1/validation",
-    "epochs": 10,
+    "epochs": 20,
     "frac_files": 1,
     "frac_files_test": 1,
     "nlog_epoch": 1,
     "lr": 1e-4,
     "batch_size": 16,
     "batch_size_test": 50,
-    "hyper_loss": [0.1,0.1,0.1, 0.7],
+    "hyper_loss": [0.1,0.1,0.7, 0.1],
     "weights_loss_cont": {"E": 1, "dir": 1},
     "dmodel": 128,
     "nhead": 8,
@@ -46,5 +46,6 @@
     "d_out_embedder_tracks": 128,
     "d_input_tracks": 5,
     "last_FFN": false,
-    "ntrue_clusters": "all"
+    "ntrue_clusters": {"2": [22,22]},
+    "scheduler": false
 }

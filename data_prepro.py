@@ -155,11 +155,18 @@ class CollectionHits(Dataset):
         self.preprocessed = preprocessed
         self.E_cut = E_cut
         self.do_tracks = do_tracks
-        self.ntrue_clusters = ntrue_clusters
         self.do_time = do_time
         self.E_label_RMS_normalizer = RMSNormalizer()
         self.E_feats_RMS_normalizer = RMSNormalizer()
         self.pos_feats_RMS_normalizer = RMSNormalizer()
+        if isinstance(ntrue_clusters,dict):
+            self.ntrue_clusters = {}
+            for key, value in ntrue_clusters.items():
+                key_int = int(key)
+                self.ntrue_clusters[key_int] = value
+        else:
+            self.ntrue_clusters = ntrue_clusters
+                
 
     def process_dataset(self):
         if self.frac_files < 0 or self.frac_files > 1:

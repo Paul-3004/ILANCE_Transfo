@@ -45,7 +45,8 @@ def run_inference(config, args,model):
         config["dir_path_inference"] = config["dir_path_train"]
         set_fracfiles(config)
         inference(config,args,model)
-        print(f"inference on {config["dir_path_inference"]} with model epoch {model} saved in {dir_res}")
+        dir_path_inf = config["dir_path_inference"]
+        print(f"inference on {dir_path_inf} with model epoch {model} saved in {dir_res}")
     
     config["dir_results"] = dir_res_original
     config["dir_path_inference"] = path_inference_original
