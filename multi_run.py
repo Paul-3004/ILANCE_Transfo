@@ -4,6 +4,7 @@ from argparse import ArgumentParser
 import json
 import torch
 from main import train_and_validate, inference
+import main_tracks
 DEVICE = torch.device('cuda:5' if torch.cuda.is_available() else 'cpu')
 
 def set_fracfiles(config):
@@ -33,23 +34,38 @@ def run_inference(config, args,model):
     dir_res_original = config["dir_results"]
     frac_test_original = config["frac_files_test"]
     path_inference_original = config["dir_path_inference"]
+    path_inference2_original = config["dir_path_inference2"]
 
     dir_res = create_dir(config["dir_results"], model,"test")
     config["dir_results"] = dir_res
-    inference(config,args,model)
+    if config["do_tracks"]:
+        main_tracks.inference(config,args,model)
+    else:
+        inference(config,args,model)
+
     config["dir_results"] = dir_res_original
     print(f"inference on {dir_res} with model epoch {model} done")
     if args.overfit:
         dir_res = create_dir(config["dir_results"], model, "train")
         config["dir_results"] = dir_res
         config["dir_path_inference"] = config["dir_path_train"]
+        config["dir_path_inference2"] = config["dir_path_train2"]
         set_fracfiles(config)
-        inference(config,args,model)
+        if config["do_tracks"]:
+            main_tracks.inference(config,args,model)
+        else:
+            inference(config,args,model)
+       
         dir_path_inf = config["dir_path_inference"]
-        print(f"inference on {dir_path_inf} with model epoch {model} saved in {dir_res}")
+        dir_path_inf2 = config["dir_path_inference2"]
+        if config["mix_datasets"]:
+            print(f"inference on {dir_path_inf} and {dir_path_inf2} with model epoch {model} saved in {dir_res}")
+        else:
+            print(f"inference on {dir_path_inf} with model epoch {model} saved in {dir_res}")
     
     config["dir_results"] = dir_res_original
     config["dir_path_inference"] = path_inference_original
+    config["dir_path_inference2"] = path_inference2_original
     config["frac_files_test"] = frac_test_original
 
 
@@ -71,7 +87,10 @@ if __name__ == "__main__":
 
 
     if args.tf:
-        train_and_validate(config,args)
+        if config["do_tracks"]:
+            main_tracks.train_and_validate(config,args)
+        else:
+            train_and_validate(config,args)
         
         
     if args.me.count("all") > 0:

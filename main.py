@@ -259,7 +259,6 @@ def greedy_func(model,src,vocab_charges, ncluster_max: int, special_symbols: dic
     return clusters_transfo
 
 def inference(config, args, model_type):
-    print("INFERENCE CALLED __________________________-")
     logger = logging.getLogger(__name__)
     logger.propagate = False
     logging.basicConfig(filename= os.path.join(config["dir_results"], "log_inference.txt"), level= logging.INFO)
@@ -521,9 +520,15 @@ def train_and_validate(config, args):
     console = logging.StreamHandler()
     console.setLevel(logging.INFO)
     logging.getLogger().addHandler(console)
-
     logging.info("Getting the training data from" +config["dir_path_train"])
-    vocab_charges, vocab_pdgs, special_symbols, E_label_rms_normalizer, E_feats_rms_normalizer, pos_feats_rms_normalizer, train_dl, val_dl = get_data(dir_path = (config["dir_path_train"], config["dir_path_val"]), 
+
+    dir_train = config["dir_path_train"]
+    dir_val = config["dir_path_val"]
+    if config["mix_datasets"]:
+        dir_train = [dir_train, config["dir_path_train2"]]
+        dir_val = [dir_val, config["dir_path_val2"]]
+
+    vocab_charges, vocab_pdgs, special_symbols, E_label_rms_normalizer, E_feats_rms_normalizer, pos_feats_rms_normalizer, train_dl, val_dl = get_data(dir_path = (dir_train, dir_val), 
                                                                                               batch_size = config["batch_size"], 
                                                                                               frac_files = config["frac_files"],
                                                                                               model_mode = "training",
@@ -614,7 +619,7 @@ def train_and_validate(config, args):
                                        weights_loss_cont=config["weights_loss_cont"])
         if scheduler is not None:
             scheduler.step()
-            
+
         time_epoch = time() - start_time 
         logging.info("Finished training for one epoch, going to valiation")
         # val_loss_epoch, charges_val, pdgs_val,cont_val = validate_epoch(model,

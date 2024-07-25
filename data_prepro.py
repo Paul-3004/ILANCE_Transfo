@@ -4,6 +4,7 @@ import load_awkward as la
 import awkward as ak
 import numpy as np
 import glob
+import os
 from math import ceil
 from time import time
 
@@ -166,7 +167,6 @@ class CollectionHits(Dataset):
                 self.ntrue_clusters[key_int] = value
         else:
             self.ntrue_clusters = ntrue_clusters
-                
 
     def process_dataset(self):
         if self.frac_files < 0 or self.frac_files > 1:
@@ -174,8 +174,8 @@ class CollectionHits(Dataset):
 
         if self.preprocessed:
             nfiles = ceil(self.frac_files / 0.02)
-            filenames = list(sorted(glob.iglob(self.dir_path + '/data/*.pt')))
-            vocab_path = self.dir_path + "/vocabs/vocabs_normalizer.pt"
+            filenames = list(sorted(glob.iglob(os.path.join(self.dir_path, 'data/*.pt'))))
+            vocab_path = os.path.join(self.dir_path, "vocabs/vocabs_normalizer.pt")
             charges_dict, pdgs_dict, self.E_label_RMS_normalizer = torch.load(vocab_path)
             self.vocab_charges, self.vocab_pdgs = Vocab.from_dict(charges_dict), Vocab.from_dict(pdgs_dict)
             feats, labels = [], []
@@ -187,12 +187,50 @@ class CollectionHits(Dataset):
             self.feats = torch.concatenate(feats)
             self.labels = torch.concatenate(labels)
         else:
-            filenames = list(sorted(glob.iglob(self.dir_path + '/*.h5')))
-            nfiles = ceil(self.frac_files * len(filenames))
-            print(nfiles)
-            print(self.frac_files)
-            print("NEW VERSION")
-            feats, labels = self._get_data(filenames, nfiles)
+            feats,labels = [], []
+            if isinstance(self.dir_path, list) or isinstance(self.dir_path, tuple):
+                nevents = []
+                for path in self.dir_path:
+                    print(f"getting files in {path}")
+                    filenames = list(sorted(glob.iglob(os.path.join(path, '*.h5'))))
+                    nfiles = ceil(self.frac_files * len(filenames))
+                    print(nfiles)
+                    print(self.frac_files)
+                    feat_tmp, labels_tmp = self._get_data(filenames,nfiles)
+                    feats.append(feat_tmp)
+                    labels.append(labels_tmp)
+                    nevents.append(ak.num(feat_tmp, axis = 0))
+                if len(labels) != 2:
+                    raise RuntimeError(f"mixing more than 2 datasets is currently not supported")
+                feats = ak.concatenate(feats)
+                labels = ak.concatenate(labels)
+                indices1 = np.arange(nevents[0], dtype = np.int32)[:,np.newaxis]
+                indices2 = np.arange(nevents[1], dtype =np.int32)[:,np.newaxis]
+                indices = np.zeros(nevents[0] + nevents[1])
+                if nevents[0] < nevents[1]:
+                    indices2 += nevents[0]
+                    indices = np.concatenate(np.hstack([indices1,indices2[:nevents[0]]]))
+                    indices = np.concatenate([indices, np.squeeze(indices2[nevents[0]:],axis = -1)])
+                elif nevents[0] > nevents[1]:
+                    indices1 += nevents[1]
+                    indices = np.concatenate(np.hstack([indices2,indices1[:nevents[1]]]))
+                    indices = np.concatenate([indices, np.squeeze(indices1[nevents[1]:],axis = -1)])
+                else:
+                    indices2 += nevents[0]
+                    indices = np.concatenate(np.hstack([indices1, indices2]))
+                feats = feats[indices]
+                labels = labels[indices]
+                rand_gen = np.random.default_rng()
+                randperm_indices = rand_gen.permutation(nevents[0] + nevents[1])
+                feats = feats[randperm_indices]
+                labels = labels[randperm_indices]
+            else:
+                filenames = list(sorted(glob.iglob(os.path.join(self.dir_path, '*.h5'))))
+                nfiles = ceil(self.frac_files * len(filenames))
+                print(nfiles)
+                print(self.frac_files)
+                print("NEW VERSION")
+                feats, labels = self._get_data(filenames, nfiles)
                  
             #removing tracks
             hits_mask = ~(feats[:,:,5] == 1)
@@ -203,7 +241,7 @@ class CollectionHits(Dataset):
                 #splitting tracks and hits
                 tracks_feats = feats[~hits_mask] 
                 feats = feats[hits_mask]
-                self.format_tracks(tracks_feats)
+                #self.format_tracks(tracks_feats)
                 #no need for tracks in the labels
                 labels = labels[hits_mask]
             #keeping time
@@ -216,6 +254,9 @@ class CollectionHits(Dataset):
             labels = labels[PDGs_mask]
             #feats.show()
             self.formatting(feats, labels)
+            #Needs to be done after formatting feats and labels to have right values for normalising pos and E
+            if self.do_tracks is True:
+                self.format_tracks(tracks_feats)
 
     def _get_data(self,filenames, nfiles):
         if nfiles == 1:
@@ -256,8 +297,6 @@ class CollectionHits(Dataset):
             mask_true_cluster = self.select_true_clusters(labels_flat_unique[...,2],dim_count)
             labels_flat_unique = ak.flatten(ak.unflatten(labels_flat_unique,dim_count)[mask_true_cluster])
             dim_count = dim_count[mask_true_cluster]
-            feats[mask_true_cluster].show()
-            print(mask_true_cluster)
             feats = add_special_symbols(self.format_feats(feats[mask_true_cluster]), "feats")
         else:
             feats = add_special_symbols(self.format_feats(feats), "feats")
@@ -360,10 +399,9 @@ class CollectionHits(Dataset):
         Formats the tracks.
             args:
                 tracks: raw tracks from ak.Array. 
-                        features are (Charge, px, py, pz)
             
             return: 
-                formatted tracks
+                formatted tracks, features: (C,E,x,y,z,px,py,pz)
             
             Algo:
             1. Momentum is normalised to 1
@@ -372,9 +410,19 @@ class CollectionHits(Dataset):
                 0 for padding
             3. Adds padding for each event, with target max number of tracks in all events + 1
         '''
-        pnorm_tracks = np.sqrt(ak.sum(np.square(tracks[...,-3:]), axis = -1))
+        pos = tracks[...,1:4] #position x,y,z
+        pnorm_tracks = np.sqrt(ak.sum(np.square(tracks[...,-3:]), axis = -1)) #momentum^2 ~ E
+        E_pos = ak.concatenate([ak.singletons(pnorm_tracks, axis = -1),pos], axis = -1)
+        dim = ak.num(E_pos,axis =1)
+        E_pos_flat = ak.flatten(E_pos).to_numpy()
+        E_pos_torch = torch.from_numpy(E_pos_flat)
+        E_pos_torch[...,0].log10_()
+        self.E_label_RMS_normalizer.normallize(E_pos_torch[...,0])
+        self.pos_feats_RMS_normalizer.normallize(E_pos_torch[...,-3:])
+        E_pos_ak = ak.unflatten(E_pos_flat,counts = dim)
+
         p_tracks = tracks[...,-3:] / pnorm_tracks
-        tracks_norm = ak.concatenate((ak.singletons(tracks[...,-4], axis = -1), p_tracks),axis = -1)
+        tracks_norm = ak.concatenate((ak.singletons(tracks[...,-4], axis = -1),E_pos_ak ,p_tracks),axis = -1)
         one = np.ones((1,1,1)) * self.special_symbols["sample"]
         tracks_norm = ak.concatenate((tracks_norm, one), axis = -1)
         nfeats = int(ak.num(tracks_norm, axis = -1)[0,0])
@@ -385,7 +433,6 @@ class CollectionHits(Dataset):
         tracks_feats_none = ak.pad_none(tracks_norm, target = target, axis = 1, clip = True)
         tracks_feats_padded = ak.fill_none(tracks_feats_none, pad, axis = None)
         self.tracks_feats = torch.from_numpy(ak.to_numpy(tracks_feats_padded)).to(dtype = torch.float32)
-    
 
     def select_true_clusters(self,PDGs_event_flat, dim_count):
         PDGs_event = ak.unflatten(PDGs_event_flat, dim_count)
@@ -523,7 +570,7 @@ def get_data(dir_path, batch_size, frac_files,model_mode:str, preprocessed: bool
 
     elif model_mode == "inference":
         dir_path_inference = dir_path[0]
-        data_set = CollectionHitsTraining(dir_path_inference, special_symbols, frac_files, preprocessed, E_cut,do_tracks)
+        data_set = CollectionHits(dir_path_inference, special_symbols, frac_files, preprocessed, E_cut,do_tracks)
         E_label_RMSNormalizer = data_set.E_label_RMS_normalizer
         return special_symbols, E_label_RMSNormalizer, DataLoader(data_set, batch_size = batch_size)
     else:
@@ -558,7 +605,7 @@ def train_val_preprocessing(dir_train, dir_val, dir_res,frac_files, E_cut):
 
 def preprocessing(dir_data, dir_res, datatype: str, special_symbols, frac_files,E_cut):
     start = time()
-    ds = CollectionHitsTraining(dir_data, special_symbols,frac_files, False,E_cut)
+    ds = CollectionHits(dir_data, special_symbols,frac_files, False,E_cut)
     ds.process_dataset()
     end = time() - start
     print(f"time needed to make preprocessing: {end} sec")

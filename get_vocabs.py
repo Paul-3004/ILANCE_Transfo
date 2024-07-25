@@ -11,21 +11,35 @@ def get_pdg(path,frac_files):
         "eos":2,
         "sample":3
     }
+<<<<<<< Updated upstream
     ds_col = CollectionHits(path,special_symbols,frac_files,False)
     ds_col.process_dataset()
     dict_pdg = ds_col.vocab_pdgs.vocab
     return list(dict_pdg.keys())
+=======
+    #ds_col = CollectionHits(path,special_symbols,1,False)
+    #ds_col.process_dataset()
+    #dict_pdg = ds_col.vocab_pdgs.vocab
+    #return list(dict_pdg.keys())
+    return [5,6,7,8]
+>>>>>>> Stashed changes
 
 if __name__=="__main__":
     dir_ds = "/data/suehara/mldata/pfa/"
     datasets = ["ntau_10to100GeV_10", "gamma_10to100GeV_1", "gamma_5to50GeV_2", "eg_5to50GeV_1", "el_10to100GeV_1", "el_5to50GeV_2"]
 
     pdg_all = []
+<<<<<<< Updated upstream
     _, vocab_ntau_train, _ = torch.load("/data/suehara/mldata/pfa/ntau_10to100GeV_10/preprocessed/training/vocabs/vocabs_normalizer.pt")
     pdg_ntau_train = list(vocab_ntau_train.keys())
     print(f"pdg ntau train: {pdg_ntau_train}")
+=======
+    #_, vocab_ntau_train, _ = torch.load("/data/suehara/mldata/pfa/ntau_10to100GeV_10/preprocessed/training/vocabs/vocabs_normalizer.pt")
+    #pdg_ntau_train = list(vocab_ntau_train.keys())
+    #print(f"pdg ntau train: {pdg_ntau_train}")
+>>>>>>> Stashed changes
     pdg_all = []
-    pdg_all.append(pdg_ntau_train)
+    #pdg_all.append(pdg_ntau_train)
     for ds in datasets:
         subdirs = ["train", "validation","test"]
         ds_with_sub = ["ntau_10to100GeV_10", "gamma_10to100GeV_1", "gamma_5to50GeV_2"]
@@ -44,10 +58,17 @@ if __name__=="__main__":
 
         else:
             print(f"getting pdg of {dir_voc}")
+<<<<<<< Updated upstream
             pdg = get_pdg(dir_voc,frac_files)
             pdg_all += pdg
             print(pdg)
 
+=======
+            pdg = get_pdg(dir_voc)
+            pdg_all.append(pdg)
+            print(pdg)
+print(pdg_all)
+>>>>>>> Stashed changes
 pdg_np = np.array(pdg_all)
 pdg_unique = np.unique(pdg_np)
 print(f"unique pdgs: {pdg_unique}")
