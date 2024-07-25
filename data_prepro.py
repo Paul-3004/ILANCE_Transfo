@@ -270,7 +270,8 @@ class CollectionHits(Dataset):
 
         #Creating vocabularies:
         charges_keys = [-50,-1,0,1]
-        abs_pdg_keys = torch.unique(labels[...,1]).tolist()
+        #abs_pdg_keys = torch.unique(labels[...,1]).tolist()
+        abs_pdg_keys = [-50,11,13,22,111,130,211,310,321,411,431]
         self.vocab_charges = Vocab(charges_keys)
         self.vocab_pdgs = Vocab(abs_pdg_keys)
         labels[...,0] = self.vocab_charges.tokens_to_indices(labels[...,0])

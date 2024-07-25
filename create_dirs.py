@@ -36,7 +36,7 @@ def modify_template(template, param_name,param_value, dir_path,ds_path):
 
 def convert_str(values, param_name):
     to_int = ["dmodel", "batch_size"]
-    to_bool = ["do_tracks", "norm_first"]
+    to_bool = ["do_tracks", "norm_first", "scheduler"]
     to_float = ["lr"]
     if to_int.count(param_name) > 0:
         values = [int(x) for x in values]
