@@ -30,9 +30,13 @@ def modify_template(template, param_name,param_value, dir_path,ds_path):
     template["dir_model"] = dir_path
     template["path_charges"] = dir_path
     template["path_PDGs"] = dir_path
-    template["dir_path_inference"] = os.path.join(ds_path, "test")
-    template["dir_path_train"] = os.path.join(ds_path, "train")
-    template["dir_path_val"] = os.path.join(ds_path, "validation")
+    template["dir_path_inference"] = os.path.join(ds_path[0], "test")
+    template["dir_path_train"] = os.path.join(ds_path[0], "train")
+    template["dir_path_val"] = os.path.join(ds_path[0], "validation")
+    if len(ds_path) > 1:
+        template["dir_path_train2"] = os.path.join(ds_path[1], "train")
+        template["dir_path_val2"] = os.path.join(ds_path[1], "validation")
+        template["dir_path_inference2"] = os.path.join(ds_path[1], "test")
 
 def convert_str(values, param_name):
     to_int = ["dmodel", "batch_size"]
@@ -55,7 +59,7 @@ if __name__ == "__main__":
     parser.add_argument("-p", type = str, help="name of parameter to vary")
     parser.add_argument("-v",type = str, nargs="+", help = "values of varying parameter")
     parser.add_argument("-d", type= str, help = "directory in which new directories will be created")
-    parser.add_argument("-ds", type= str, help = "directory in which new directories will be created")
+    parser.add_argument("-ds", type= str, nargs = "+",help = "directory in which new directories will be created")
     args = parser.parse_args()
 
     param_vals = args.v
@@ -64,20 +68,32 @@ if __name__ == "__main__":
         param_vals = list(param_vals)
     param_vals = convert_str(param_vals, param_name)
     dir_root = args.d
-    dataset = args.ds
-    ds_path = ""
+    datasets = args.ds
     ds1 = "g1"
     ds2 = "g2"
     ds3 = "tau"
-    if dataset == ds1:
-        ds_path = "/data/suehara/mldata/pfa/gamma_10to100GeV_1"
-    elif dataset == ds2:
-        ds_path = "/data/suehara/mldata/pfa/gamma_5to50GeV_2"
-    elif dataset == ds3:
-        ds_path = "/data/suehara/mldata/pfa/ntau_10to100GeV_10"
-    else:
-        raise RuntimeError(f"Incorrect entry for dataset: {dataset}. Expected {ds1}, {ds2} or {ds3}")
-    
+    ds4 = "el1"
+    ds5 = "el2"
+    ds6 = "eg"
+    ds_s = []
+    for dataset in datasets:
+        ds_path = ""
+        if dataset == ds1:
+            ds_path = "/data/suehara/mldata/pfa/gamma_10to100GeV_1"
+        elif dataset == ds2:
+            ds_path = "/data/suehara/mldata/pfa/gamma_5to50GeV_2"
+        elif dataset == ds3:
+            ds_path = "/data/suehara/mldata/pfa/ntau_10to100GeV_10"
+        elif dataset == ds4:
+            ds_path = "/data/suehara/mldata/pfa/el_10to100GeV_1"
+        elif dataset == ds5:
+            ds_path = "/data/suehara/mldata/pfa/el_5to50GeV_2"
+        elif dataset == ds6:
+            ds_path = "/data/suehara/mldata/pfa/eg_5to50GeV_1"
+        else:
+            raise RuntimeError(f"Incorrect entry for dataset: {dataset}. Expected {ds1}, {ds2} or {ds3}")
+        ds_s.append(ds_path)
+        
     if not isinstance(param_vals,list):
         param_vals = list(param_vals)
     if not os.path.isdir(dir_root):
@@ -91,6 +107,6 @@ if __name__ == "__main__":
         keys = list(config.keys())
         if keys.count(param_name) < 1:
             raise RuntimeError(f"Parameter {param_name} is invalid")
-        modify_template(config,param_name,val, dir_path, ds_path)
+        modify_template(config,param_name,val, dir_path, ds_s)
         with open(os.path.join(dir_path,"ConfigFile.json"), 'w') as fp:
             json.dump(config,fp, indent=2)

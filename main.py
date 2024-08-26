@@ -296,8 +296,12 @@ def inference(config, args, model_type):
 
     if config["dtype"] == "torch.float32":
         dtype = torch.float32
-    
-    special_symbols, E_label_RMS_normalizer, src_loader = get_data_inference((config["dir_path_inference"], ), 
+        
+    dir_test = config["dir_path_inference"]
+    if config["mix_datasets"]:
+        dir_test = [dir_test, config["dir_path_inference2"]]
+
+    special_symbols, E_label_RMS_normalizer, src_loader = get_data_inference((dir_test, ), 
                                                                     config["batch_size_test"], config["frac_files_test"],
                                                                     E_label_rms_normalizer, E_feats_rms_normalizer, pos_feats_rms_normalizer, 
                                                                     False, config["E_cut"], config["shuffle"], config["do_tracks"],
@@ -535,6 +539,7 @@ def train_and_validate(config, args):
                                                                                               preprocessed= config["preprocessed"],
                                                                                               E_cut= config["E_cut"],
                                                                                               shuffle = config["shuffle"],
+                                                                                              do_tracks = config["do_tracks"],
                                                                                               ntrue_clusters= config["ntrue_clusters"])
     torch.save(vocab_charges.vocab, os.path.join(config["dir_results"], "vocab_charges.pt"))
     torch.save(vocab_pdgs.vocab, os.path.join(config["dir_results"],"vocab_PDGs.pt"))
@@ -555,7 +560,7 @@ def train_and_validate(config, args):
     optim = torch.optim.Adam(model.parameters(), lr = config["lr"])
     scheduler = None
     if config["scheduler"]:
-        scheduler = torch.optim.lr_scheduler.StepLR(optim,2,0.5)
+        scheduler = torch.optim.lr_scheduler.StepLR(optim,8,0.5)
     
     loss_fn_charges = nn.CrossEntropyLoss(reduction ='mean')
     loss_fn_pdgs = nn.CrossEntropyLoss(reduction ='mean')

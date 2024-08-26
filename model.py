@@ -356,6 +356,7 @@ class ClustersFinderTracks(nn.Module):
         src = self.input_embedder(src)
         tgt = self.tgt_embedder(tgt)
         tracks = self.tracks_embedder(tracks)
+        #print(f"tracks {tracks}")
         output = self.transformer(src = src, tracks = tracks, labels = tgt, 
                                   src_key_padding_mask = src_padding_mask, 
                                   tgt_key_padding_mask = tgt_padding_mask,
@@ -364,6 +365,7 @@ class ClustersFinderTracks(nn.Module):
                                   tgt_mask = self.generate_causal_mask(tgt.shape[1], self.device),
                                   tgt_is_causal = True, #generates causal mask for tgt  
                                   )
+        #print(f"output transfo {output}")
         out_charge = self.lastlin_charge(output)
         out_pdg = self.lastlin_pdg(output)
         out_cont = self.lastlin_cont(output)

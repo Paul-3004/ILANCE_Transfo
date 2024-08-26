@@ -256,8 +256,12 @@ def inference(config, args, model_type):
 
     if config["dtype"] == "torch.float32":
         dtype = torch.float32
-    
-    special_symbols, E_label_RMS_normalizer, src_loader = get_data_inference((config["dir_path_inference"], ), 
+        
+    dir_inf = config["dir_path_inference"]
+    if config["mix_datasets"]:
+        dir_inf = [dir_inf, config["dir_path_inference2"]]
+
+    special_symbols, E_label_RMS_normalizer, src_loader = get_data_inference((dir_inf, ), 
                                                                     config["batch_size_test"], config["frac_files_test"],
                                                                     E_label_rms_normalizer, E_feats_rms_normalizer, pos_feats_rms_normalizer, 
                                                                     False, config["E_cut"], config["shuffle"], config["do_tracks"],
@@ -343,8 +347,9 @@ def train_epoch(model, optim, train_dl, special_symbols,vocab_charges, vocab_pdg
         #nspe_tokens = torch.count_nonzero(spe_tokens_mask, dim = -1)
         #n_nospe = spe_tokens_mask.shape[-1] - nspe_tokens
         #loss_cont = torch.mean(torch.sum(loss_cont_vec[~spe_tokens_mask], dim = -1))
-        
         loss = loss_charges * hyperweights_lossfn[0] + loss_pdg * hyperweights_lossfn[1] + loss_cont*hyperweights_lossfn[2] + loss_tokens * hyperweights_lossfn[-1]
+        if torch.all(torch.isnan(loss)):
+            raise RuntimeError("stop")
         loss.backward()
         optim.step()
 
@@ -491,6 +496,7 @@ def train_and_validate(config, args):
                                                                                               preprocessed= config["preprocessed"],
                                                                                               E_cut= config["E_cut"],
                                                                                               shuffle = config["shuffle"],
+                                                                                              do_tracks = config["do_tracks"],                                                     
                                                                                               ntrue_clusters= config["ntrue_clusters"])
     torch.save(vocab_charges.vocab, os.path.join(config["dir_results"], "vocab_charges.pt"))
     torch.save(vocab_pdgs.vocab, os.path.join(config["dir_results"],"vocab_PDGs.pt"))
@@ -605,13 +611,13 @@ def train_and_validate(config, args):
 
         if val_loss_epoch < val_loss_min:
             logging.info("New best Model, saving...")
-            torch.save(model.state_dict(), config["dir_results"] + "best_model.pt")
+            torch.save(model.state_dict(), os.path.join(config["dir_results"], "best_model.pt"))
             val_loss_min = val_loss_min
         logging.info("Saving current model...")
-        torch.save(model.state_dict(), config["dir_results"] + f"model_epoch_{i}")
+        torch.save(model.state_dict(), os.path.join(config["dir_results"], f"model_epoch_{i}"))
         logging.info(f"{i + 1} epoch done, time: {time_epoch}, val_loss: {val_loss_epoch}, train_loss: {train_loss_epoch}")
     
-        torch.save(losses_evolution, config["dir_results"] + f"losses_epoch_{i}.pt")
+        torch.save(losses_evolution, os.path.join(config["dir_results"], f"losses_epoch_{i}.pt"))
     logging.info("Finished all epochs and saved the losses")
 
 if __name__ == "__main__":

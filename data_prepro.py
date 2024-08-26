@@ -239,7 +239,7 @@ class CollectionHits(Dataset):
                 labels = labels[hits_mask]
             else:
                 #splitting tracks and hits
-                tracks_feats = feats[~hits_mask] 
+                self.tracks_feats = feats[~hits_mask] 
                 feats = feats[hits_mask]
                 #self.format_tracks(tracks_feats)
                 #no need for tracks in the labels
@@ -255,8 +255,8 @@ class CollectionHits(Dataset):
             #feats.show()
             self.formatting(feats, labels)
             #Needs to be done after formatting feats and labels to have right values for normalising pos and E
-            if self.do_tracks is True:
-                self.format_tracks(tracks_feats)
+            #if self.do_tracks is True:
+                #self.format_tracks(tracks_feats)
 
     def _get_data(self,filenames, nfiles):
         if nfiles == 1:
@@ -293,19 +293,24 @@ class CollectionHits(Dataset):
         #Adding special symbols after formatting feats and labels
         add_special_symbols = AddSpecialSymbols(self.special_symbols)
         labels_flat_unique, dim_count = self.shrink_labels(labels)
+        mask_true_cluster = np.ones(ak.num(labels, axis = 0), dtype = np.bool8)
         if self.ntrue_clusters != "all":
             mask_true_cluster = self.select_true_clusters(labels_flat_unique[...,2],dim_count)
             labels_flat_unique = ak.flatten(ak.unflatten(labels_flat_unique,dim_count)[mask_true_cluster])
             dim_count = dim_count[mask_true_cluster]
-            feats = add_special_symbols(self.format_feats(feats[mask_true_cluster]), "feats")
-        else:
-            feats = add_special_symbols(self.format_feats(feats), "feats")
+
+        self.feats = feats[mask_true_cluster]
+        if self.do_tracks:
+            self.tracks_feats = self.tracks_feats[mask_true_cluster]
         labels = add_special_symbols(self.format_labels(labels_flat_unique, dim_count), "labels")
-        
+        feats = add_special_symbols(self.format_feats(feats[mask_true_cluster]), "feats")
         feats = torch.from_numpy(ak.to_numpy(feats)).to(dtype = torch.float32)
         labels = torch.from_numpy(ak.to_numpy(labels)).to(dtype = torch.float32)
         self.labels = labels
         self.feats = feats
+        if self.do_tracks:
+            self.format_tracks(self.tracks_feats)
+
 
         #Creating vocabularies:
         charges_keys = [-50,-1,0,1]
@@ -313,8 +318,8 @@ class CollectionHits(Dataset):
         abs_pdg_keys = [-50,11,13,22,111,130,211,310,321,411,431]
         self.vocab_charges = Vocab(charges_keys)
         self.vocab_pdgs = Vocab(abs_pdg_keys)
-        labels[...,0] = self.vocab_charges.tokens_to_indices(labels[...,0])
-        labels[...,1] = self.vocab_pdgs.tokens_to_indices(labels[...,1])
+        self.labels[...,0] = self.vocab_charges.tokens_to_indices(self.labels[...,0])
+        self.labels[...,1] = self.vocab_pdgs.tokens_to_indices(self.labels[...,1])
 
     '''called during shrink_labels to compute energy and normalize momentum
         Args:
@@ -351,7 +356,9 @@ class CollectionHits(Dataset):
         #computing the indices of every unique entry of the flattened array
         _, indices_unique = np.unique(ak.to_numpy(mc_id_flat), axis = 0, return_index = True) 
 
-        labels_flat = ak.flatten(labels, axis = 1)[indices_unique] #taking first representative 
+        labels_flat = ak.flatten(labels, axis = 1)[indices_unique] #taking first representative
+        cluster_mask = dim_count == 1
+        print(ak.sum(cluster_mask))
         return labels_flat, dim_count
 
     '''Keep only 1 representative of each clusters in the label dataset 
@@ -367,7 +374,6 @@ class CollectionHits(Dataset):
         labels_flat_torch[...,2].abs_() #absolute value of PDGs
         self.format_E_pos_label(labels_flat_torch[...,4:8])
         indices_features = [3,2,4,5,6,7] #3: charge 2: pdg, 4: mass, 5-7: momentum (mass to compute energy)
-        #norm2_torch = labels_flat_torch[]
         labels = ak.unflatten(labels_flat_torch.numpy(), dim_count)[..., indices_features] #putting back to expected shape
         #Discarding low energy clusters 
         self.E_cut = np.log10(self.E_cut)
@@ -375,6 +381,13 @@ class CollectionHits(Dataset):
         self.E_cut /= self.E_label_RMS_normalizer.RMS
         E_mask = labels[...,2] > self.E_cut.item()
         labels = labels[E_mask]
+        mask_no_label = ak.all(~E_mask, axis = -1)
+        if self.do_tracks:
+            self.tracks_feats = self.tracks_feats[~mask_no_label]
+            
+        self.feats = self.feats[~mask_no_label]
+        if ak.all(ak.num(labels) == 0):
+            raise RuntimeError(f"no labels corresponds to constraint {self.ntrue_clusters} and E threshold")
         indices_sort_E = ak.argsort(labels[...,2], axis = -1, ascending= False)
         return labels[indices_sort_E] #sorting by descending energy
 
@@ -410,27 +423,33 @@ class CollectionHits(Dataset):
                 0 for padding
             3. Adds padding for each event, with target max number of tracks in all events + 1
         '''
-        pos = tracks[...,1:4] #position x,y,z
-        pnorm_tracks = np.sqrt(ak.sum(np.square(tracks[...,-3:]), axis = -1)) #momentum^2 ~ E
-        E_pos = ak.concatenate([ak.singletons(pnorm_tracks, axis = -1),pos], axis = -1)
-        dim = ak.num(E_pos,axis =1)
-        E_pos_flat = ak.flatten(E_pos).to_numpy()
-        E_pos_torch = torch.from_numpy(E_pos_flat)
-        E_pos_torch[...,0].log10_()
-        self.E_label_RMS_normalizer.normallize(E_pos_torch[...,0])
-        self.pos_feats_RMS_normalizer.normallize(E_pos_torch[...,-3:])
-        E_pos_ak = ak.unflatten(E_pos_flat,counts = dim)
+        mask_no_track = ak.num(tracks) > 0
+        tracks = tracks[mask_no_track]
+        self.feats = self.feats[mask_no_track]
+        self.labels = self.labels[mask_no_track]
+        ntracks_max = int(ak.max(ak.num(tracks, axis = 1)))
+        if ntracks_max > 0:
+            pos = tracks[...,1:4] #position x,y,z
+            pnorm_tracks = np.sqrt(ak.sum(np.square(tracks[...,-3:]), axis = -1)) #momentum^2 ~ E
+            E_pos = ak.concatenate([ak.singletons(pnorm_tracks, axis = -1),pos], axis = -1)
+            dim = ak.num(E_pos,axis =1)
+            E_pos_flat = ak.flatten(E_pos).to_numpy()
+            E_pos_torch = torch.from_numpy(E_pos_flat)
+            E_pos_torch[...,0].log10_()
+            self.E_label_RMS_normalizer.normallize(E_pos_torch[...,0])
+            self.pos_feats_RMS_normalizer.normallize(E_pos_torch[...,-3:])
+            E_pos_ak = ak.unflatten(E_pos_flat,counts = dim)
 
-        p_tracks = tracks[...,-3:] / pnorm_tracks
-        tracks_norm = ak.concatenate((ak.singletons(tracks[...,-4], axis = -1),E_pos_ak ,p_tracks),axis = -1)
-        one = np.ones((1,1,1)) * self.special_symbols["sample"]
-        tracks_norm = ak.concatenate((tracks_norm, one), axis = -1)
-        nfeats = int(ak.num(tracks_norm, axis = -1)[0,0])
-        ntracks_max = int(ak.max(ak.num(tracks_norm, axis = 1)))
+            p_tracks = tracks[...,-3:] / pnorm_tracks
+            tracks_norm = ak.concatenate((ak.singletons(tracks[...,-4], axis = -1),E_pos_ak ,p_tracks),axis = -1)
+            one = np.ones((1,1,1)) * self.special_symbols["sample"]
+            tracks = ak.concatenate((tracks_norm, one), axis = -1)
+        #nfeats = int(ak.max(ak.num(tracks_norm, axis = -1)))
+        nfeats = 9
         target = ntracks_max + 1 #in case ntracks_max = 0, at least there's one pad 
         pad = np.zeros(nfeats)
         pad[-1] = self.special_symbols["pad"]
-        tracks_feats_none = ak.pad_none(tracks_norm, target = target, axis = 1, clip = True)
+        tracks_feats_none = ak.pad_none(tracks, target = target, axis = 1, clip = True)
         tracks_feats_padded = ak.fill_none(tracks_feats_none, pad, axis = None)
         self.tracks_feats = torch.from_numpy(ak.to_numpy(tracks_feats_padded)).to(dtype = torch.float32)
 
@@ -444,8 +463,8 @@ class CollectionHits(Dataset):
             for key in self.ntrue_clusters:
                 assert key == len(self.ntrue_clusters[key]), f"{key} clusters but {len(self.ntrue_clusters[key])} were given"
                 mask_ncluster = dim_count_np == key
-                if ak.count_nonzero(mask_ncluster) > 0:
-                    mask_pdg = ak.all(np.isin(self.ntrue_clusters[key], PDGs_event[mask_ncluster]), axis = -1, keepdims = True)
+                if ak.count_nonzero(mask_ncluster) > 0: 
+                    mask_pdg = ak.all(np.isin(PDGs_event[mask_ncluster], self.ntrue_clusters[key]), axis = -1)   
                     if ak.count_nonzero(mask_pdg) > 0:
                         mask_ncluster[mask_ncluster > 0] = mask_pdg
                         mask += mask_ncluster
@@ -520,6 +539,7 @@ class CollectionHitsInference(CollectionHits):
             raise ValueError("The fraction of files must lie inbetween 0 and 1")
 
         super(CollectionHitsInference,self).__init__(dir_path,special_symbols,frac_files,preprocessed,E_cut,do_tracks,ntrue_clusters,do_time)
+        print(dir_path)
         self.E_label_RMS_normalizer = E_label_norm
         self.E_feats_RMS_normalizer = E_feats_norm
         self.pos_feats_RMS_normalizer = pos_feats_norm

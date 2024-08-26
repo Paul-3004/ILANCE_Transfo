@@ -1,0 +1,226 @@
+from matplotlib import pyplot as plt
+from natsort import natsorted
+import numpy as np
+import torch
+import awkward as ak
+from argparse import ArgumentParser
+from matplotlib import rc
+from time import time
+import glob
+import os
+import csv
+import pandas as pd
+from predictions import accuracy, load_pred_labels
+rc('text', usetex = True)
+rc("axes", labelsize = 25)
+rc("xtick", labelsize = 22)
+rc("ytick", labelsize = 22)
+rc("axes", titlesize = 25)
+rc("legend", fontsize = 25)
+plt.rcParams['figure.constrained_layout.use'] = True
+fields =  ["charges", "pdgs", "energy", "dir", "excess"]
+def create_dir(dir_path):
+    dir_prev, head = os.path.split(dir_path)
+    if not dir_prev:
+        os.mkdir(head)
+    if not os.path.isdir(dir_path):
+        if not os.path.isdir(dir_prev):
+            create_dir(dir_prev)
+            create_dir(dir_path)
+        else:
+            os.mkdir(dir_path)
+
+
+def savefig(filename,fig, ext = "svg", transparent = True):
+    dir_Results = "Results"
+    dir_Graphs = "Graphs"
+    rel_Res = os.path.relpath(filename,dir_Results)
+    path_save = os.path.join(dir_Graphs,rel_Res)
+    dir_save, _ = os.path.split(path_save)
+    create_dir(dir_save)
+    fig.savefig(filename, format = ext, transparent = transparent)
+    print(f"Figure {filename} saved")
+def convert_labels_tex(label):
+    if isinstance(label,int):
+        label = r"$%d$"%label
+    elif isinstance(label, str):
+        label = r"$\textrm{%s}$"%label
+        
+def convert_acc_label(acc):
+    if acc == "energy":
+        return r"$\frac{|E_l -E_p|}{E_l}$"
+    elif acc == "charges":
+        return r"$\textrm{Charge accuracy}$"
+    elif acc == "pdgs":
+        return r"$\textrm{PDG accuracy}$"
+    elif acc == "dir":
+        return r"$\theta_{lp} \, [^\circ]$"
+    elif acc == "excess":
+        return r"$\textrm{Excess predictions of clusters}$"
+    else:
+        raise ValueError(f"{acc} is an invalid accuracy type. Expected energy, charges, pdgs, dir or excess.")
+    return acc
+
+def convert_label_latex(label):
+    if isinstance(label, int):
+        return r"$%d$"%label
+    elif isinstance(label, str):
+        return r"$\textrm{%s}$"%label
+
+def get_res_folders(dir_param, ds):
+    dirs_path = natsorted(glob.iglob(os.path.join(dir_param, "*",ds)))
+    if len(dirs_path) == 0:
+        raise RuntimeError(f"No inference on {ds} for the models in {dir_param}")
+    return dirs_path
+def get_full_acc(dir_path):
+    print(f"Getting pred, labels in {dir_path}")
+    pred, labels = load_pred_labels(dir_path)
+    #pred.show()
+    #labels.show()
+    acc_full = accuracy(pred, labels, "full", False, "full", "full", "full", "full", "full")
+    fields = ["charges", "pdgs", "energy", "dir", "excess"]
+    return dict(zip(fields,acc_full))
+    #return acc_full #order is (C, PDG, E, theta, excess)
+
+def save_evo(dir_save,ds,evo):
+    filename = os.path.join(dir_save,"evo_accs_" + ds + ".csv")
+    print(f"saving the accuracies in {filename}")
+    with open(filename,'w', newline='') as f:
+        writer = csv.DictWriter(f,fieldnames= list(evo[0].keys()))
+        writer.writeheader() # writing the titles
+        writer.writerows(evo)
+
+def evo_acc_param(dir_root, ds):
+    dir_path = get_res_folders(dir_root, ds)
+    print(f"Computing accuracy in dir {dir_path}")
+    evo_tot = []
+    for path in dir_path:
+        acc_full = get_full_acc(path)
+        evo_tot.append(acc_full)
+
+    save_evo(dir_root,ds,evo_tot)
+
+def evo_acc_all_param(dir_root, ds):
+    dir_paths = natsorted(glob.iglob(os.path.join(dir_root, "*")))
+    print(f"Computing all accuracies in {dir_paths}")
+    if ds == "both":
+        datasets = ["test", "train"]
+    else:
+        datasets = []
+        datasets.append(ds)
+    for dir_param in dir_paths:
+        for ds in datasets:
+            evo_acc_param(dir_param, ds)
+
+def plot_evo_param_single_acc(dir_param,ds,acc):
+    acc_evo = get_evo_param_single_acc(dir_param,ds,acc)
+    fig, ax = plt.subplots()
+    ax.plot(range(1,len(acc_evo) + 1), acc_evo)
+    ylabel = convert_acc_label(acc)
+    ax.set(xlabel = r"$\textrm{epoch}$", ylabel =ylabel)
+    ax.legend()
+
+def get_evo_param_single_acc(dir_param, ds, acc):
+    filename = os.path.join(dir_param,"evo_accs_" +ds + ".csv")
+    df = pd.read_csv(filename)
+    if acc in df.columns:
+        return df[acc]
+    else:
+        raise ValueError(f"{acc} is invalid key. Expected energy, charges, pdgs, dir or excess.")
+
+def compare_2evos(dirs, ds_s, label_type,savedir,labels = None, bigdir =False):
+    print(dirs)
+    if bigdir:
+        print(dirs[0])
+        dirs = natsorted(list(glob.iglob(os.path.join(dirs[0], "*/"))))
+        print(dirs)
+    if isinstance(ds_s, str):
+        ds_s = [ds_s] * len(dirs)
+    if len(dirs) != len(ds_s):
+        raise RuntimeError("Number of directories and ds must match")
+    for field in fields:
+        fig,ax = plt.subplots()
+        for i,(path,ds) in enumerate(zip(dirs,ds_s)):
+            print(f"getting evo from {path}")
+            acc = get_evo_param_single_acc(path,ds, field)
+            epochs = range(1,len(acc))
+            label = ""
+            if label_type == "ds":
+                label = r"$\textrm{%s}$"%ds
+            else:
+                label = convert_label_latex(labels[i])
+            ax.plot(epochs, acc[:-1],label = label) #last one is best_model so already plotted
+        ax.set(xlabel = r"$\textrm{epoch}$", ylabel = convert_acc_label(field))
+        ax.legend()
+        ax.grid(which= "both")
+        fn = os.path.join("Graphs", savedir, f"{field}.svg")
+        savefig(fn,fig)
+
+    
+def compare_E_theta_evo(path,ds):
+    if isinstance(ds,list) or isinstance(ds, tuple):
+        for d in ds:
+            fig, ax = plt.subplots()
+            E_evo = get_evo_param_single_acc(path,d,"energy")
+            theta_evo = get_evo_param_single_acc(path,d,"dir")
+            epochs = range(1,len(E_evo)+1)
+            ax.plot(epochs, E_evo)
+            ax.set(xlabel = r"$\textrm{epoch}$", ylabel = convert_acc_label("energy"))
+            ax_theta = ax.twinx()
+            ax_theta.plot(epochs, theta_evo)
+            ax_theta.set(ylabel = r"$\theta_{pl}$")
+            fig.tight_layout()
+    else:
+        fig, ax = plt.subplots()
+        E_evo = get_evo_param_single_acc(path,d,"energy")
+        theta_evo = get_evo_param_single_acc(path,d,"dir")
+        epochs = range(1,len(E_evo)+1)
+        ax.plot(epochs, E_evo)
+        ax.set(xlabel = r"$\textrm{epoch}$", ylabel = convert_acc_label("energy"))
+        ax_theta = ax.twinx()
+        ax_theta.plot(epochs, theta_evo)
+        ax_theta.set(ylabel = r"$\theta_{pl}\,  [^{\circ}]$")
+        fig.tight_layout()
+
+def get_best(filename):
+    df = pd.read_csv(filename)
+    return df.iloc[-1]
+    
+def print_best(dir_root, ds):
+    filename = os.path.join(dir_root, "evo_accs_" + ds + ".csv")
+    if os.path.isfile(filename):
+        best = get_best(filename)
+        print(f"In {os.path.dirname(filename)} best is: {best}")
+
+    else:
+        csvs_evo = list(natsorted(glob.iglob(os.path.join(dir_root, "**/evo_accs_" + ds + ".csv"), recursive=True)))
+        if len(csvs_evo) > 0:
+            for path in csvs_evo:
+                print(f"getting best in {path}")
+                best = get_best(path)
+                print(f"In {os.path.dirname(path)} best is: {best}")
+        else:
+            raise RuntimeError(f"No evolution file in {dir_root}")
+
+if __name__ == "__main__":
+    ds_s = ["test", "train"]
+    parser = ArgumentParser()
+    parser.add_argument("-d", type = str, nargs = "+", help = "Directories to take data from")
+    parser.add_argument("-ds", action = "store_true", help = "if True plot accuracies on test and train set on same plots")
+    parser.add_argument("--best", action = "store_true", help = "if True, print accuracies for best model")
+    parser.add_argument("--train", action = "store_true", help = "results on train dataset")
+    parser.add_argument("--test", action = "store_true", help = "results on test dataset")
+    parser.add_argument("-l", type = str, nargs ="+", help = "fig labels")
+    parser.add_argument("-savedir", type = str, help = "relative path from Graphs to store figs")
+    parser.add_argument("--bigdir", action = "store_true")
+    args = parser.parse_args()
+    dir_path = args.d
+    if args.ds:
+        for path in dir_path:
+            compare_2evos((path, path), ds_s, "ds", args.savedir)
+    else:
+        if args.train:
+            compare_2evos(dir_path, "train", "spe", args.savedir,args.l, args.bigdir)
+        elif args.test:
+            compare_2evos(dir_path, "test", "spe", args.savedir,args.l, args.bigdir)
+    plt.show()
